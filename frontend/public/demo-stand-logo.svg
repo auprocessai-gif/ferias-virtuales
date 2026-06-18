@@ -1,0 +1,8 @@
+<svg width="800" height="400" viewBox="0 0 800 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="800" height="400" rx="48" fill="#0F172A"/>
+  <rect x="34" y="34" width="732" height="332" rx="36" fill="#111827" stroke="#10B981" stroke-width="6"/>
+  <circle cx="180" cy="200" r="78" fill="#10B981"/>
+  <path d="M154 208L178 232L224 168" stroke="#0F172A" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="300" y="180" fill="#F8FAFC" font-family="Arial, Helvetica, sans-serif" font-size="54" font-weight="900">ECOBYTE</text>
+  <text x="304" y="236" fill="#94A3B8" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" letter-spacing="5">SMART ENERGY LAB</text>
+</svg>

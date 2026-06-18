@@ -1,0 +1,14 @@
+<svg width="1200" height="700" viewBox="0 0 1200 700" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="700" fill="#17201E"/>
+  <rect x="64" y="58" width="1072" height="584" rx="52" fill="#F8FAFC"/>
+  <rect x="112" y="112" width="976" height="136" rx="26" fill="#0F172A"/>
+  <text x="158" y="194" fill="#10B981" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="900">ECOBYTE SMART ENERGY</text>
+  <rect x="112" y="292" width="300" height="238" rx="30" fill="#DCFCE7"/>
+  <rect x="450" y="292" width="300" height="238" rx="30" fill="#E0F2FE"/>
+  <rect x="788" y="292" width="300" height="238" rx="30" fill="#FEF3C7"/>
+  <path d="M190 456C224 382 286 382 322 456" stroke="#10B981" stroke-width="22" stroke-linecap="round"/>
+  <circle cx="256" cy="374" r="34" fill="#10B981"/>
+  <path d="M522 420H678M522 372H678M522 468H618" stroke="#0284C7" stroke-width="20" stroke-linecap="round"/>
+  <path d="M876 470L940 358L1004 470H876Z" fill="#F59E0B"/>
+  <text x="136" y="594" fill="#334155" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="800">Monitorizacion, ahorro energetico y analitica predictiva para edificios inteligentes.</text>
+</svg>
