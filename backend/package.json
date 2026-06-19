@@ -4,6 +4,9 @@
   "description": "",
   "main": "index.js",
   "type": "commonjs",
+  "engines": {
+    "node": ">=22.3.0"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
