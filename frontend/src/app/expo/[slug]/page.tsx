@@ -19,6 +19,20 @@ interface PavilionNavItem {
   name: string;
 }
 
+const withTimeout = async <T,>(promise: PromiseLike<T>, message: string, timeoutMs = 10000): Promise<T> => {
+  let timeoutId: number | undefined;
+
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timeoutId) window.clearTimeout(timeoutId);
+  }
+};
+
 export default function FairExpoPage() {
   const { slug } = useParams();
   const router = useRouter();
@@ -50,18 +64,24 @@ export default function FairExpoPage() {
         setError(null);
         setAccessStatus("checking");
 
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await withTimeout(
+          supabase.auth.getSession(),
+          "No se pudo comprobar la sesión. Recarga la página e inténtalo de nuevo."
+        );
         if (!session?.user) {
           const search = typeof window !== "undefined" ? window.location.search : "";
           router.replace(`/login?redirect=${encodeURIComponent(`/expo/${slug}${search}`)}`);
           return;
         }
 
-        const { data: event, error: eventErr } = await supabase
-          .from("events")
-          .select("*")
-          .eq("slug", slug)
-          .single();
+        const { data: event, error: eventErr } = await withTimeout(
+          supabase
+            .from("events")
+            .select("*")
+            .eq("slug", slug)
+            .single(),
+          "La feria está tardando demasiado en cargar."
+        );
 
         if (eventErr || !event) {
           throw new Error("Feria no encontrada o no disponible.");
@@ -77,12 +97,15 @@ export default function FairExpoPage() {
         const visibility = event.visibility || "public";
         const registrationMode = event.registration_mode || "open";
 
-        const { data: participant, error: participantErr } = await supabase
-          .from("event_participants")
-          .select("id,status")
-          .eq("event_id", event.id)
-          .eq("user_id", session.user.id)
-          .maybeSingle();
+        const { data: participant, error: participantErr } = await withTimeout(
+          supabase
+            .from("event_participants")
+            .select("id,status")
+            .eq("event_id", event.id)
+            .eq("user_id", session.user.id)
+            .maybeSingle(),
+          "No se pudo comprobar tu acceso a la feria."
+        );
 
         let participantStatus = participant?.status as string | undefined;
         const accessTablesReady = !participantErr;
@@ -96,30 +119,36 @@ export default function FairExpoPage() {
         }
 
         if (!participantStatus && accessTablesReady && visibility === "public" && registrationMode === "open") {
-          const { data: registered, error: registerErr } = await supabase
-            .from("event_participants")
-            .insert({
-              event_id: event.id,
-              user_id: session.user.id,
-              status: "registered",
-              source: "self_registration",
-            })
-            .select("status")
-            .single();
+          const { data: registered, error: registerErr } = await withTimeout(
+            supabase
+              .from("event_participants")
+              .insert({
+                event_id: event.id,
+                user_id: session.user.id,
+                status: "registered",
+                source: "self_registration",
+              })
+              .select("status")
+              .single(),
+            "No se pudo registrar tu entrada a la feria."
+          );
 
           if (registerErr) throw registerErr;
           participantStatus = registered?.status || "registered";
         } else if (!participantStatus && accessTablesReady && registrationMode === "approval_required") {
-          const { data: pending, error: pendingErr } = await supabase
-            .from("event_participants")
-            .insert({
-              event_id: event.id,
-              user_id: session.user.id,
-              status: "pending",
-              source: "self_registration",
-            })
-            .select("status")
-            .single();
+          const { data: pending, error: pendingErr } = await withTimeout(
+            supabase
+              .from("event_participants")
+              .insert({
+                event_id: event.id,
+                user_id: session.user.id,
+                status: "pending",
+                source: "self_registration",
+              })
+              .select("status")
+              .single(),
+            "No se pudo crear tu solicitud de acceso."
+          );
 
           if (pendingErr) throw pendingErr;
           participantStatus = pending?.status || "pending";
@@ -134,7 +163,10 @@ export default function FairExpoPage() {
             ? invitationQuery.eq("token", invitationToken)
             : invitationQuery.ilike("email", userEmail);
 
-          const { data: invitation, error: invitationErr } = await invitationQuery.maybeSingle();
+          const { data: invitation, error: invitationErr } = await withTimeout(
+            invitationQuery.maybeSingle(),
+            "No se pudo comprobar la invitación."
+          );
 
           if (invitationErr) {
             console.warn("[access] invitation check failed", invitationErr.message);
@@ -146,27 +178,33 @@ export default function FairExpoPage() {
             : false;
 
           if (invitation && invitationEmailMatches && !invitationExpired) {
-            const { data: invitedParticipant, error: invitedErr } = await supabase
-              .from("event_participants")
-              .insert({
-                event_id: event.id,
-                user_id: session.user.id,
-                status: "approved",
-                source: "invitation",
-              })
-              .select("status")
-              .single();
+            const { data: invitedParticipant, error: invitedErr } = await withTimeout(
+              supabase
+                .from("event_participants")
+                .insert({
+                  event_id: event.id,
+                  user_id: session.user.id,
+                  status: "approved",
+                  source: "invitation",
+                })
+                .select("status")
+                .single(),
+              "No se pudo aceptar la invitación."
+            );
 
             if (invitedErr) throw invitedErr;
 
-            const { error: acceptErr } = await supabase
-              .from("event_invitations")
-              .update({
-                status: "accepted",
-                accepted_by: session.user.id,
-                accepted_at: new Date().toISOString(),
-              })
-              .eq("id", invitation.id);
+            const { error: acceptErr } = await withTimeout(
+              supabase
+                .from("event_invitations")
+                .update({
+                  status: "accepted",
+                  accepted_by: session.user.id,
+                  accepted_at: new Date().toISOString(),
+                })
+                .eq("id", invitation.id),
+              "La invitación fue aceptada, pero no se pudo actualizar su estado."
+            );
 
             if (acceptErr) {
               console.warn("[access] invitation accepted but invitation row was not updated", acceptErr.message);
@@ -193,11 +231,14 @@ export default function FairExpoPage() {
           metadata: { slug },
         });
 
-        const { data: pavilionsData, error: pavErr } = await supabase
-          .from("pavilions")
-          .select("*")
-          .eq("event_id", event.id)
-          .order("created_at", { ascending: true });
+        const { data: pavilionsData, error: pavErr } = await withTimeout(
+          supabase
+            .from("pavilions")
+            .select("*")
+            .eq("event_id", event.id)
+            .order("created_at", { ascending: true }),
+          "No se pudieron cargar los pabellones."
+        );
 
         if (pavErr) throw pavErr;
 
