@@ -7,6 +7,17 @@ import { Lock, Mail, ArrowRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useSearchParams } from "next/navigation";
 
+const AUTH_TIMEOUT_MS = 12000;
+
+function withTimeout<T>(promise: PromiseLike<T>, label: string, timeoutMs = AUTH_TIMEOUT_MS): Promise<T> {
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise<T>((_, reject) => {
+      window.setTimeout(() => reject(new Error(`${label} timed out`)), timeoutMs);
+    }),
+  ]);
+}
+
 export default function LoginPage() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-[#050505]" />}>
@@ -25,11 +36,21 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        window.location.href = redirectTo;
-      }
-    });
+    let mounted = true;
+
+    withTimeout(supabase.auth.getSession(), "Session check", 6000)
+      .then(({ data: { session } }) => {
+        if (mounted && session?.user) {
+          window.location.href = redirectTo;
+        }
+      })
+      .catch((err) => {
+        console.warn("[login] session check unavailable", err);
+      });
+
+    return () => {
+      mounted = false;
+    };
   }, [redirectTo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,13 +60,25 @@ function LoginForm() {
     console.log("Intentando iniciar sesión con:", email);
     try {
       if (isLogin) {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await withTimeout(
+          supabase.auth.signInWithPassword({ email, password }),
+          "Login"
+        );
         console.log("Respuesta de Supabase:", { data, error });
         if (error) throw error;
         console.log("Login exitoso, redirigiendo...");
         window.location.href = redirectTo;
       } else {
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        const { data, error } = await withTimeout(
+          supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: `${window.location.origin}${redirectTo}`,
+            },
+          }),
+          "Registro"
+        );
         if (error) throw error;
         if (data.session) {
           window.location.href = redirectTo;
@@ -55,7 +88,8 @@ function LoginForm() {
         }
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "No se pudo completar el acceso.");
+      const message = err instanceof Error ? err.message : "No se pudo completar el acceso.";
+      setError(message.includes("timed out") ? "Supabase ha tardado demasiado en responder. Prueba de nuevo en unos segundos." : message);
     } finally {
       setLoading(false);
     }
