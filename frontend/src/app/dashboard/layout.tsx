@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { usePathname } from "next/navigation";
 
 const dashboardRoles = new Set(["admin", "manager", "exhibitor", "speaker"]);
-const DASHBOARD_AUTH_TIMEOUT_MS = 8000;
+const DASHBOARD_AUTH_TIMEOUT_MS = 20000;
 type ProfileRoleResponse = { data: { role: string } | null; error: { message: string } | null };
 
 function withTimeout<T>(promise: PromiseLike<T>, label: string, timeoutMs = DASHBOARD_AUTH_TIMEOUT_MS): Promise<T> {
@@ -17,6 +17,26 @@ function withTimeout<T>(promise: PromiseLike<T>, label: string, timeoutMs = DASH
       window.setTimeout(() => reject(new Error(`${label} timed out`)), timeoutMs);
     }),
   ]);
+}
+
+const wait = (milliseconds: number) => new Promise<void>((resolve) => {
+  window.setTimeout(resolve, milliseconds);
+});
+
+async function retry<T>(factory: () => PromiseLike<T>, label: string, attempts = 3): Promise<T> {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await withTimeout(factory(), label);
+    } catch (error) {
+      lastError = error;
+      console.warn(`[dashboard] ${label} attempt ${attempt + 1} failed`, error);
+      await wait(700);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(`${label} failed`);
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -33,8 +53,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         setLoading(true);
         setAccessError(null);
 
-        const { data: { session } } = await withTimeout(
-          supabase.auth.getSession(),
+        const { data: { session } } = await retry(
+          () => supabase.auth.getSession(),
           "Dashboard session check"
         );
 
@@ -43,12 +63,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           return;
         }
 
-        const { data: profile, error: profileError } = await withTimeout<ProfileRoleResponse>(
-          supabase
+        const { data: profile, error: profileError } = await retry<ProfileRoleResponse>(
+          () => supabase
             .from('profiles')
             .select('role')
             .eq('id', session.user.id)
-            .single() as unknown as PromiseLike<ProfileRoleResponse>,
+            .maybeSingle() as unknown as PromiseLike<ProfileRoleResponse>,
           "Dashboard profile check"
         );
 
