@@ -53,10 +53,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         setLoading(true);
         setAccessError(null);
 
-        const { data: { session } } = await retry(
-          () => supabase.auth.getSession(),
-          "Dashboard session check"
-        );
+        const { data: { session } } = await supabase.auth.getSession();
 
         if (!session?.user) {
           window.location.href = `/login?redirect=${encodeURIComponent(pathname || "/dashboard")}`;

@@ -38,7 +38,7 @@ function LoginForm() {
   useEffect(() => {
     let mounted = true;
 
-    withTimeout(supabase.auth.getSession(), "Session check", 6000)
+    supabase.auth.getSession()
       .then(({ data: { session } }) => {
         if (mounted && session?.user) {
           window.location.href = redirectTo;

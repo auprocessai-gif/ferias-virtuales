@@ -39,12 +39,7 @@ export default function StandSocialPanel({ stand }: StandSocialPanelProps) {
 
     async function fetchUser() {
       try {
-        const { data: { session } } = await Promise.race([
-          supabase.auth.getSession(),
-          new Promise<{ data: { session: null } }>((resolve) => {
-            window.setTimeout(() => resolve({ data: { session: null } }), 3500);
-          }),
-        ]);
+        const { data: { session } } = await supabase.auth.getSession();
 
         if (cancelled) return;
 

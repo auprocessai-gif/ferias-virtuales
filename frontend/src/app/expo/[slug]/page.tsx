@@ -42,11 +42,7 @@ const getSessionResultWithRetry = async () => {
 
   for (let attempt = 0; attempt < 4; attempt += 1) {
     try {
-      const result = await withTimeout(
-        supabase.auth.getSession(),
-        "No se pudo comprobar la sesion. Recarga la pagina e intentalo de nuevo.",
-        5000
-      );
+      const result = await supabase.auth.getSession();
 
       if (result.data.session?.user) return result;
     } catch (err) {
@@ -106,10 +102,7 @@ export default function FairExpoPage() {
         setError(null);
         setAccessStatus("checking");
 
-        const { data: { session } } = await withTimeout(
-          getSessionResultWithRetry(),
-          "No se pudo comprobar la sesión. Recarga la página e inténtalo de nuevo."
-        );
+        const { data: { session } } = await getSessionResultWithRetry();
         if (!session?.user) {
           const search = typeof window !== "undefined" ? window.location.search : "";
           router.replace(`/login?redirect=${encodeURIComponent(`/expo/${slug}${search}`)}`);
