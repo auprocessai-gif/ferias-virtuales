@@ -35,9 +35,33 @@ export default function StandSocialPanel({ stand }: StandSocialPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function fetchUser() {
-      const { data: { session } } = await supabase.auth.getSession();
-      setCurrentUser(session?.user ? { id: session.user.id, email: session.user.email || undefined } : null);
+      try {
+        const { data: { session } } = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise<{ data: { session: null } }>((resolve) => {
+            window.setTimeout(() => resolve({ data: { session: null } }), 3500);
+          }),
+        ]);
+
+        if (cancelled) return;
+
+        if (session?.user) {
+          setCurrentUser({ id: session.user.id, email: session.user.email || undefined });
+          return;
+        }
+
+        if (userId && !userId.startsWith("guest_")) {
+          setCurrentUser({ id: userId });
+        }
+      } catch (error) {
+        console.warn("[stand-chat] user session unavailable", error);
+        if (!cancelled && userId && !userId.startsWith("guest_")) {
+          setCurrentUser({ id: userId });
+        }
+      }
     }
 
     async function fetchMessages() {
@@ -55,46 +79,17 @@ export default function StandSocialPanel({ stand }: StandSocialPanelProps) {
     fetchUser();
     fetchMessages();
 
-    let pollInterval: number | null = null;
-    const channel = supabase
-      .channel(`chat:${room}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `room=eq.${room}`,
-        },
-        (payload) => {
-          setMessages((current) => {
-            const incoming = payload.new as Message;
-            if (current.some((message) => message.id === incoming.id)) return current;
-            const withoutOptimisticDuplicate = current.filter((message) => !(
-              message.id.startsWith("local-")
-              && message.user_id === incoming.user_id
-              && message.content === incoming.content
-              && message.room === incoming.room
-            ));
-            return [...withoutOptimisticDuplicate, incoming];
-          });
-        }
-      )
-      .subscribe((status) => {
-        if ((status === "CHANNEL_ERROR" || status === "TIMED_OUT") && !pollInterval) {
-          pollInterval = window.setInterval(fetchMessages, 3000);
-        }
-      });
-
-    if (!pollInterval) {
-      pollInterval = window.setInterval(fetchMessages, 2000);
-    }
+    const pollInterval = window.setInterval(fetchMessages, 3000);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCurrentUser(session?.user ? { id: session.user.id, email: session.user.email || undefined } : null);
+    });
 
     return () => {
-      supabase.removeChannel(channel);
-      if (pollInterval) window.clearInterval(pollInterval);
+      cancelled = true;
+      subscription.unsubscribe();
+      window.clearInterval(pollInterval);
     };
-  }, [room]);
+  }, [room, userId]);
 
   const sendMessage = async (event: React.FormEvent) => {
     event.preventDefault();
