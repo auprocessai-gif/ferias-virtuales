@@ -15,13 +15,3 @@ export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey, {
     timeout: 30000,        // Extend timeout for slow/unstable WSS connections
   }
 });
-
-// Helper for Realtime Status monitoring
-if (typeof window !== 'undefined') {
-    supabase.channel('system_health')
-        .subscribe((status) => {
-            if (status === 'CHANNEL_ERROR') {
-                console.warn("Supabase Realtime Sync Error: Fallbacks are active.");
-            }
-        });
-}
