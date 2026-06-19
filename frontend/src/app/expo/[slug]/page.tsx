@@ -262,6 +262,7 @@ export default function FairExpoPage() {
         }
       } catch (err: unknown) {
         console.error("Error loading fair:", err);
+        setAccessStatus("denied");
         setError(err instanceof Error ? err.message : "Error de conexión");
       } finally {
         setLoading(false);
@@ -395,6 +396,23 @@ export default function FairExpoPage() {
     });
   };
 
+  if (error) {
+    return (
+      <div className="flex bg-[#050505] min-h-[calc(100vh-64px)] w-full items-center justify-center text-white">
+        <div className="glass p-12 rounded-3xl text-center max-w-lg border border-red-500/20">
+          <h2 className="text-2xl font-black uppercase tracking-widest text-red-400 mb-4">Acceso Denegado</h2>
+          <p className="opacity-60">{error}</p>
+          <button
+            onClick={() => router.push("/")}
+            className="mt-8 rounded-xl bg-white px-5 py-3 text-[10px] font-black uppercase tracking-widest text-black transition hover:bg-primary"
+          >
+            Volver al inicio
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (mounted && loadExpired) {
     return (
       <div className="flex bg-[#050505] min-h-[calc(100vh-64px)] w-full items-center justify-center text-white">
@@ -418,23 +436,6 @@ export default function FairExpoPage() {
     return (
       <div className="flex bg-[#050505] min-h-[calc(100vh-64px)] w-full items-center justify-center">
         <div className="w-16 h-16 border-t-2 border-primary border-solid rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex bg-[#050505] min-h-[calc(100vh-64px)] w-full items-center justify-center text-white">
-        <div className="glass p-12 rounded-3xl text-center max-w-lg border border-red-500/20">
-          <h2 className="text-2xl font-black uppercase tracking-widest text-red-400 mb-4">Acceso Denegado</h2>
-          <p className="opacity-60">{error}</p>
-          <button
-            onClick={() => router.push("/")}
-            className="mt-8 rounded-xl bg-white px-5 py-3 text-[10px] font-black uppercase tracking-widest text-black transition hover:bg-primary"
-          >
-            Volver al inicio
-          </button>
-        </div>
       </div>
     );
   }
