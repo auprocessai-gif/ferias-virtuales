@@ -19,7 +19,7 @@ interface PavilionNavItem {
   name: string;
 }
 
-const withTimeout = async <T,>(promise: PromiseLike<T>, message: string, timeoutMs = 10000): Promise<T> => {
+const withTimeout = async <T,>(promise: PromiseLike<T>, message: string, timeoutMs = 30000): Promise<T> => {
   let timeoutId: number | undefined;
 
   const timeout = new Promise<never>((_, reject) => {
@@ -31,6 +31,34 @@ const withTimeout = async <T,>(promise: PromiseLike<T>, message: string, timeout
   } finally {
     if (timeoutId) window.clearTimeout(timeoutId);
   }
+};
+
+const wait = (milliseconds: number) => new Promise<void>((resolve) => {
+  window.setTimeout(resolve, milliseconds);
+});
+
+const getSessionResultWithRetry = async () => {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      const result = await withTimeout(
+        supabase.auth.getSession(),
+        "No se pudo comprobar la sesion. Recarga la pagina e intentalo de nuevo.",
+        5000
+      );
+
+      if (result.data.session?.user) return result;
+    } catch (err) {
+      lastError = err;
+      console.warn(`[expo] session check attempt ${attempt + 1} failed`, err);
+    }
+
+    await wait(700);
+  }
+
+  if (lastError) throw lastError;
+  return { data: { session: null } };
 };
 
 export default function FairExpoPage() {
@@ -64,7 +92,7 @@ export default function FairExpoPage() {
 
     const timeoutId = window.setTimeout(() => {
       setLoadExpired(true);
-    }, 12000);
+    }, 32000);
 
     return () => window.clearTimeout(timeoutId);
   }, [mounted, loading]);
@@ -79,7 +107,7 @@ export default function FairExpoPage() {
         setAccessStatus("checking");
 
         const { data: { session } } = await withTimeout(
-          supabase.auth.getSession(),
+          getSessionResultWithRetry(),
           "No se pudo comprobar la sesión. Recarga la página e inténtalo de nuevo."
         );
         if (!session?.user) {
