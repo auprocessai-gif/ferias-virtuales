@@ -40,6 +40,7 @@ export default function FairExpoPage() {
 
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadExpired, setLoadExpired] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accessStatus, setAccessStatus] = useState<AccessStatus>("checking");
 
@@ -54,6 +55,19 @@ export default function FairExpoPage() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!mounted || !loading) {
+      setLoadExpired(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setLoadExpired(true);
+    }, 12000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [mounted, loading]);
 
   useEffect(() => {
     async function fetchFairData() {
@@ -380,6 +394,25 @@ export default function FairExpoPage() {
       metadata: { title: stand.title, source: "assistant_recommendation" },
     });
   };
+
+  if (mounted && loadExpired) {
+    return (
+      <div className="flex bg-[#050505] min-h-[calc(100vh-64px)] w-full items-center justify-center text-white">
+        <div className="glass p-12 rounded-3xl text-center max-w-lg border border-orange-500/20">
+          <h2 className="text-2xl font-black uppercase tracking-widest text-orange-400 mb-4">Carga detenida</h2>
+          <p className="opacity-60">
+            La feria tarda demasiado en responder. Recarga la página o vuelve a iniciar sesión.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-8 rounded-xl bg-primary px-5 py-3 text-[10px] font-black uppercase tracking-widest text-black transition hover:bg-white"
+          >
+            Recargar feria
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!mounted || loading || accessStatus === "checking") {
     return (
