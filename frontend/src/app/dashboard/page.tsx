@@ -18,6 +18,17 @@ interface RecentActivity {
   created_at: string;
 }
 
+const DASHBOARD_METRICS_TIMEOUT_MS = 8000;
+
+function withTimeout<T>(promise: PromiseLike<T>, label: string, timeoutMs = DASHBOARD_METRICS_TIMEOUT_MS): Promise<T> {
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise<T>((_, reject) => {
+      window.setTimeout(() => reject(new Error(`${label} timed out`)), timeoutMs);
+    }),
+  ]);
+}
+
 export default function Dashboard() {
   const [userEmail, setUserEmail] = useState("");
   const [metrics, setMetrics] = useState<DashboardMetrics>({
@@ -39,14 +50,20 @@ export default function Dashboard() {
     async function loadRealMetrics() {
       try {
         const [{ data: summaries }, { data: activity }] = await Promise.all([
-          supabase
-            .from("fair_analytics_summary")
-            .select("fair_entries,stand_views,leads,registered_participants"),
-          supabase
-            .from("analytics_events")
-            .select("id,action,metadata,created_at")
-            .order("created_at", { ascending: false })
-            .limit(5),
+          withTimeout(
+            supabase
+              .from("fair_analytics_summary")
+              .select("fair_entries,stand_views,leads,registered_participants"),
+            "Dashboard summary metrics"
+          ),
+          withTimeout(
+            supabase
+              .from("analytics_events")
+              .select("id,action,metadata,created_at")
+              .order("created_at", { ascending: false })
+              .limit(5),
+            "Dashboard recent activity"
+          ),
         ]);
 
         setMetrics({

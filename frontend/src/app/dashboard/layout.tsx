@@ -7,44 +7,81 @@ import { supabase } from "@/lib/supabase";
 import { usePathname } from "next/navigation";
 
 const dashboardRoles = new Set(["admin", "manager", "exhibitor", "speaker"]);
+const DASHBOARD_AUTH_TIMEOUT_MS = 8000;
+type ProfileRoleResponse = { data: { role: string } | null; error: { message: string } | null };
+
+function withTimeout<T>(promise: PromiseLike<T>, label: string, timeoutMs = DASHBOARD_AUTH_TIMEOUT_MS): Promise<T> {
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise<T>((_, reject) => {
+      window.setTimeout(() => reject(new Error(`${label} timed out`)), timeoutMs);
+    }),
+  ]);
+}
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [accessError, setAccessError] = useState<string | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+
     async function getProfile() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        setLoading(true);
+        setAccessError(null);
+
+        const { data: { session } } = await withTimeout(
+          supabase.auth.getSession(),
+          "Dashboard session check"
+        );
+
         if (!session?.user) {
           window.location.href = `/login?redirect=${encodeURIComponent(pathname || "/dashboard")}`;
           return;
         }
 
-        if (session?.user) {
-          const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await withTimeout<ProfileRoleResponse>(
+          supabase
             .from('profiles')
             .select('role')
             .eq('id', session.user.id)
-            .single();
-          
-          const profileRole = profile?.role || "participant";
+            .single() as unknown as PromiseLike<ProfileRoleResponse>,
+          "Dashboard profile check"
+        );
 
-          if (!dashboardRoles.has(profileRole)) {
-            window.location.href = "/";
-            return;
+        if (profileError) throw profileError;
+
+        const profileRole = profile?.role || "participant";
+
+        if (!dashboardRoles.has(profileRole)) {
+          if (mounted) {
+            setRole(profileRole);
+            setAccessError("Tu usuario esta registrado como participante. Ese rol puede entrar a la feria, pero no al panel de gestion.");
           }
+          return;
+        }
 
+        if (mounted) {
           setRole(profileRole);
         }
       } catch (err) {
         console.error("DashboardLayout Auth Error:", err);
+        if (mounted) {
+          setAccessError("No se pudo comprobar tu acceso al panel. Revisa la conexion o vuelve a iniciar sesion.");
+        }
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     }
+
     getProfile();
+
+    return () => {
+      mounted = false;
+    };
   }, [pathname]);
 
   const handleLogout = async () => {
@@ -55,6 +92,27 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   if (loading) return (
     <div className="min-h-screen bg-[#050505] flex items-center justify-center">
       <div className="w-12 h-12 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  if (accessError) return (
+    <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center px-6">
+      <div className="max-w-lg rounded-3xl border border-white/10 bg-white/[0.04] p-8 text-center shadow-2xl">
+        <p className="mb-3 text-[10px] font-black uppercase tracking-[0.3em] text-primary">Acceso al panel</p>
+        <h1 className="mb-4 text-2xl font-black uppercase tracking-tight">No se pudo abrir el panel</h1>
+        <p className="mb-6 text-sm leading-6 text-white/55">{accessError}</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+          <Link href="/" className="rounded-xl bg-white px-5 py-3 text-[10px] font-black uppercase tracking-widest text-orange-600 transition hover:bg-orange-50">
+            Volver a la feria
+          </Link>
+          <button
+            onClick={handleLogout}
+            className="rounded-xl border border-white/10 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-white/70 transition hover:border-white/30 hover:text-white"
+          >
+            Cerrar sesion
+          </button>
+        </div>
+      </div>
     </div>
   );
 
