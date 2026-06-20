@@ -335,10 +335,16 @@ export default function Home() {
           )}
 
           <div className="mt-5 flex flex-col gap-3 border-t border-white/10 pt-5 text-sm text-white/55">
-            <Link href="/login" className="inline-flex items-center gap-2 font-bold text-white transition hover:text-primary">
-              Crear cuenta o acceder con enlace
-              <ArrowRight size={14} />
-            </Link>
+            {sessionReady && isSignedIn && !canOpenPanel && !participantFairSlug ? (
+              <div className="text-sm font-bold leading-6 text-white/70">
+                Para activar esta cuenta, abre la URL exacta de la feria que te ha enviado el organizador.
+              </div>
+            ) : (
+              <Link href="/login" className="inline-flex items-center gap-2 font-bold text-white transition hover:text-primary">
+                Crear cuenta o acceder con enlace
+                <ArrowRight size={14} />
+              </Link>
+            )}
             <p className="text-xs leading-5 text-white/38">
               Si has recibido una invitación, abre el enlace exacto de tu evento para activar el acceso.
             </p>
