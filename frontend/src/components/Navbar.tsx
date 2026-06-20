@@ -124,6 +124,12 @@ export default function Navbar() {
   };
 
   const handlePabellonRedirect = (e: React.MouseEvent) => {
+    if (userRole === 'participant' && !participantFairSlug && !window.location.pathname.startsWith('/expo/')) {
+      e.preventDefault();
+      alert('Esta cuenta es de participante, pero todavia no tiene una feria asignada. Abre el enlace exacto de la feria o pide al organizador que te asigne acceso.');
+      return;
+    }
+
     // Si estamos en una ruta de feria /expo/[slug], evitamos la recarga completa
     if (window.location.pathname.startsWith('/expo/')) {
       e.preventDefault();

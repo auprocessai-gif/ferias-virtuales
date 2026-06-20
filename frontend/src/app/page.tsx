@@ -170,7 +170,7 @@ export default function Home() {
   };
 
   const canOpenPanel = currentRole === "admin" || currentRole === "manager";
-  const participantFairHref = participantFairSlug ? `/expo/${participantFairSlug}` : "/login";
+  const participantFairHref = participantFairSlug ? `/expo/${participantFairSlug}` : null;
 
   return (
     <div className="relative min-h-[calc(100vh-64px)] overflow-hidden bg-[#050505] text-white">
@@ -260,13 +260,19 @@ export default function Home() {
                   <div className="rounded-lg border border-orange-400/20 bg-orange-500/10 p-4 text-sm leading-6 text-orange-50/75">
                     Esta cuenta es de participante. Los participantes no tienen panel de control.
                   </div>
-                  <Link
-                    href={participantFairHref}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-black transition hover:bg-white"
-                  >
-                    {participantFairSlug ? "Entrar a mi feria" : "Abrir enlace de feria"}
-                    <ArrowRight size={16} />
-                  </Link>
+                  {participantFairHref ? (
+                    <Link
+                      href={participantFairHref}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-black transition hover:bg-white"
+                    >
+                      Entrar a mi feria
+                      <ArrowRight size={16} />
+                    </Link>
+                  ) : (
+                    <div className="rounded-lg border border-white/10 bg-white/[0.04] p-4 text-sm leading-6 text-white/55">
+                      No encontramos una feria asignada a esta cuenta. Abre el enlace exacto de la feria o pide al organizador que te active el acceso.
+                    </div>
+                  )}
                 </div>
               )}
 
