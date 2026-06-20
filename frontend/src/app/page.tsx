@@ -14,6 +14,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState(false);
+  const [currentEmail, setCurrentEmail] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -21,11 +22,13 @@ export default function Home() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return;
       setIsSignedIn(Boolean(session?.user));
+      setCurrentEmail(session?.user?.email || null);
       setSessionReady(true);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsSignedIn(Boolean(session?.user));
+      setCurrentEmail(session?.user?.email || null);
       setSessionReady(true);
     });
 
@@ -42,7 +45,9 @@ export default function Home() {
 
     const { data: { session: currentSession } } = await supabase.auth.getSession();
     if (currentSession?.user) {
-      window.location.href = "/dashboard";
+      setCurrentEmail(currentSession.user.email || "usuario activo");
+      setIsSignedIn(true);
+      setLoading(false);
       return;
     }
 
@@ -72,6 +77,23 @@ export default function Home() {
       }
 
       setError(loginError instanceof Error ? loginError.message : "No se pudo iniciar sesion.");
+      setLoading(false);
+    }
+  };
+
+  const handleSwitchAccount = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      await supabase.auth.signOut();
+      setIsSignedIn(false);
+      setCurrentEmail(null);
+      setEmail("");
+      setPassword("");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "No se pudo cerrar la sesion actual.");
+    } finally {
       setLoading(false);
     }
   };
@@ -138,13 +160,31 @@ export default function Home() {
           </div>
 
           {sessionReady && isSignedIn ? (
-            <Link
-              href="/dashboard"
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-black transition hover:bg-white"
-            >
-              Ir a mi panel
-              <ArrowRight size={16} />
-            </Link>
+            <div className="space-y-4">
+              <div className="rounded-lg border border-white/10 bg-white/[0.04] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">Sesion activa</p>
+                <p className="mt-2 text-sm leading-6 text-white/60">
+                  Ahora estas dentro como <span className="font-bold text-white">{currentEmail || "usuario activo"}</span>.
+                </p>
+              </div>
+
+              <Link
+                href="/dashboard"
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-black transition hover:bg-white"
+              >
+                Ir a mi panel
+                <ArrowRight size={16} />
+              </Link>
+
+              <button
+                type="button"
+                onClick={handleSwitchAccount}
+                disabled={loading}
+                className="flex w-full items-center justify-center rounded-lg border border-white/10 px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-white/70 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loading ? "Cerrando sesion..." : "Cerrar sesion y entrar con otra cuenta"}
+              </button>
+            </div>
           ) : (
             <form onSubmit={handleLogin} className="space-y-4">
               {error && (
