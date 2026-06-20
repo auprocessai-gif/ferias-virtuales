@@ -56,7 +56,7 @@ export default function Auditorium() {
 
   // MASTER SWITCH: If not live and no local capture, show Standby
   const isCurrentlyLive = stageState.is_live || !!localStream;
-  const isAuthorized = userRole === 'admin' || userRole === 'speaker';
+  const isAuthorized = userRole === 'admin' || userRole === 'manager';
   const viewerCount = onlineUsers.filter(u => u.current_stand_id === 'auditorium').length || 1;
 
   return (

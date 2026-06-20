@@ -153,7 +153,28 @@ export default function FairExpoPage() {
           console.warn("[access] participant tables are not ready yet", participantErr.message);
         }
 
+        const ensureParticipantCapacity = async () => {
+          const participantLimit = Number(event.participant_limit || 0);
+          if (!participantLimit || !accessTablesReady) return;
+
+          const { count, error: countErr } = await withTimeout(
+            supabase
+              .from("event_participants")
+              .select("id", { count: "exact", head: true })
+              .eq("event_id", event.id)
+              .in("status", ["registered", "approved", "pending"]),
+            "No se pudo comprobar el aforo de la feria."
+          );
+
+          if (countErr) throw countErr;
+          if ((count || 0) >= participantLimit) {
+            throw new Error("El aforo de esta feria esta completo.");
+          }
+        };
+
         if (!participantStatus && accessTablesReady && visibility === "public" && registrationMode === "open") {
+          await ensureParticipantCapacity();
+
           const { data: registered, error: registerErr } = await withTimeout(
             supabase
               .from("event_participants")
@@ -171,6 +192,8 @@ export default function FairExpoPage() {
           if (registerErr) throw registerErr;
           participantStatus = registered?.status || "registered";
         } else if (!participantStatus && accessTablesReady && registrationMode === "approval_required") {
+          await ensureParticipantCapacity();
+
           const { data: pending, error: pendingErr } = await withTimeout(
             supabase
               .from("event_participants")

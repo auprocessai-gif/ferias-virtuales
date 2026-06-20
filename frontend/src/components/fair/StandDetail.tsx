@@ -58,7 +58,7 @@ export default function StandDetail({ stand, onClose }: StandDetailProps) {
   const assistantRef = useRef<HTMLDivElement | null>(null);
   const { updateStatus } = usePresence();
   const { userRole } = useFairStore();
-  const canManageStandDocuments = userRole === "admin" || userRole === "manager" || userRole === "exhibitor" || userRole === "speaker";
+  const canManageStandDocuments = userRole === "admin" || userRole === "manager";
   const standTheme = getStandTheme(stand);
 
   useEffect(() => {

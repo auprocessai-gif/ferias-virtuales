@@ -9,6 +9,10 @@ import { usePresence } from "@/context/PresenceProvider";
 import { useFairStore, type UserRole } from "@/store/useFairStore";
 import { usePathname } from "next/navigation";
 
+const normalizeUserRole = (role?: string | null): UserRole => (
+  role === 'admin' || role === 'manager' ? role : 'participant'
+);
+
 export default function Navbar() {
   const pathname = usePathname();
   const { onlineUsers, isNexusConnected } = usePresence();
@@ -29,7 +33,7 @@ export default function Navbar() {
           .eq('id', currentUser.id)
           .single();
         
-        if (profile?.role) setUserRole(profile.role as UserRole);
+        setUserRole(normalizeUserRole(profile?.role));
       } else {
         setUserRole(null);
       }
@@ -48,7 +52,7 @@ export default function Navbar() {
           .eq('id', currentUser.id)
           .single();
         
-        if (profile?.role) setUserRole(profile.role as UserRole);
+        setUserRole(normalizeUserRole(profile?.role));
       } else {
         setUserRole(null);
       }
@@ -82,7 +86,7 @@ export default function Navbar() {
     return null;
   }
 
-  const canOpenPanel = userRole === 'admin' || userRole === 'manager' || userRole === 'exhibitor' || userRole === 'speaker';
+  const canOpenPanel = userRole === 'admin' || userRole === 'manager';
 
   return (
     <header className="fixed top-2 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl h-16 rounded-2xl border border-white/20 bg-orange-600 backdrop-blur-3xl flex items-center px-8 justify-between shadow-[0_20px_50px_rgba(255,81,0,0.3)]">

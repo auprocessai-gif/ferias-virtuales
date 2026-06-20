@@ -18,6 +18,7 @@ export default function FairSettingsPage() {
     status: "draft",
     visibility: "public",
     registration_mode: "open",
+    participant_limit: "",
   });
 
   useEffect(() => {
@@ -31,6 +32,7 @@ export default function FairSettingsPage() {
             status: data.status || "draft",
             visibility: data.visibility || "public",
             registration_mode: data.registration_mode || "open",
+            participant_limit: data.participant_limit ? String(data.participant_limit) : "",
           });
         }
       } catch (err) {
@@ -53,6 +55,7 @@ export default function FairSettingsPage() {
           status: fair.status,
           visibility: fair.visibility,
           registration_mode: fair.registration_mode,
+          participant_limit: fair.participant_limit ? Number(fair.participant_limit) : null,
         })
         .eq("id", fairId);
 
@@ -172,6 +175,21 @@ export default function FairSettingsPage() {
               <Lock className={fair.registration_mode === "invite_only" ? "text-red-400" : "text-white/20"} />
             </button>
           </div>
+        </div>
+
+        <div className="space-y-2 pt-6 border-t border-white/5">
+          <label className="text-[10px] font-bold uppercase tracking-widest text-primary ml-4">Aforo contratado</label>
+          <input
+            type="number"
+            min="1"
+            placeholder="Sin limite"
+            className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-white placeholder-white/20 focus:border-primary focus:outline-none transition-colors"
+            value={fair.participant_limit}
+            onChange={(e) => setFair({ ...fair, participant_limit: e.target.value })}
+          />
+          <p className="ml-4 text-xs text-white/35">
+            Si una feria se vende para 200 personas, pon 200. Si lo dejas vacio, no hay limite automatico.
+          </p>
         </div>
 
         <div className="pt-8">

@@ -2,11 +2,11 @@
 
 import { ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
-import { LayoutDashboard, LogOut, Settings, Video, Box, Briefcase, Inbox } from "lucide-react";
+import { LayoutDashboard, LogOut, Settings, Briefcase, Inbox } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { usePathname } from "next/navigation";
 
-const dashboardRoles = new Set(["admin", "manager", "exhibitor", "speaker"]);
+const dashboardRoles = new Set(["admin", "manager"]);
 const DASHBOARD_AUTH_TIMEOUT_MS = 20000;
 type ProfileRoleResponse = { data: { role: string } | null; error: { message: string } | null };
 
@@ -139,7 +139,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <aside className="w-64 flex-shrink-0 bg-black/40 border-r border-white/5 backdrop-blur-3xl flex flex-col">
         <div className="p-8 border-b border-white/5 text-center">
             <h1 className="text-xl font-black tracking-tighter bg-gradient-to-br from-white to-white/50 bg-clip-text text-transparent uppercase">
-                {role === 'admin' ? 'Super Admin' : role === 'manager' ? 'Panel Gestor' : 'Panel Expositor'}
+                {role === 'admin' ? 'Super Admin' : 'Panel Gestor'}
             </h1>
         </div>
 
@@ -161,20 +161,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               <Link href="/dashboard/fairs" className="flex items-center gap-3 px-4 py-3 rounded-xl text-white/50 hover:bg-white/5 hover:text-white transition-colors group">
                 <Briefcase size={18} className="group-hover:text-primary transition-colors"/>
                 <span className="text-xs uppercase font-bold tracking-widest">Mis Ferias</span>
-              </Link>
-            </>
-          )}
-
-          {/* Exhibitor Specific Links (MI STAND) */}
-          {role === 'exhibitor' && (
-            <>
-              <Link href="/dashboard/appearance" className="flex items-center gap-3 px-4 py-3 rounded-xl text-white/50 hover:bg-white/5 hover:text-white transition-colors group">
-                <Box size={18} className="group-hover:text-primary transition-colors"/>
-                <span className="text-xs uppercase font-bold tracking-widest">Apariencia</span>
-              </Link>
-              <Link href="/dashboard/content" className="flex items-center gap-3 px-4 py-3 rounded-xl text-white/50 hover:bg-white/5 hover:text-white transition-colors group">
-                <Video size={18} className="group-hover:text-primary transition-colors"/>
-                <span className="text-xs uppercase font-bold tracking-widest">Contenido</span>
               </Link>
             </>
           )}

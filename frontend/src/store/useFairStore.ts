@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import { Stand, Event } from '@/../../shared';
 
-export type UserRole = 'participant' | 'speaker' | 'admin' | 'manager' | 'exhibitor';
+export type UserRole = 'participant' | 'admin' | 'manager';
 
 export interface GlobalStageState {
   media_type: 'youtube' | 'pdf' | 'video' | 'meeting' | 'link';
