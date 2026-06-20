@@ -30,6 +30,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") || "/dashboard";
   const [isLogin, setIsLogin] = useState(true);
+  const [currentEmail, setCurrentEmail] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -40,9 +41,14 @@ function LoginForm() {
 
     supabase.auth.getSession()
       .then(({ data: { session } }) => {
-        if (mounted && session?.user && !redirectTo.startsWith("/dashboard")) {
-          window.location.href = redirectTo;
+        if (!mounted || !session?.user) return;
+
+        if (redirectTo.startsWith("/dashboard")) {
+          setCurrentEmail(session.user.email || "usuario activo");
+          return;
         }
+
+        window.location.href = redirectTo;
       })
       .catch((err) => {
         console.warn("[login] session check unavailable", err);
@@ -52,6 +58,23 @@ function LoginForm() {
       mounted = false;
     };
   }, [redirectTo]);
+
+  const handleSwitchAccount = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      await supabase.auth.signOut();
+      setCurrentEmail(null);
+      setEmail("");
+      setPassword("");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "No se pudo cerrar la sesion actual.";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,6 +149,41 @@ function LoginForm() {
             </p>
           </div>
 
+          {currentEmail ? (
+            <div className="space-y-5">
+              {error && (
+                <div className="px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-xs text-center">
+                  {error}
+                </div>
+              )}
+
+              <div className="rounded-2xl border border-white/10 bg-black/30 p-5 text-center">
+                <p className="mb-2 text-[10px] font-black uppercase tracking-[0.25em] text-primary">Sesion activa</p>
+                <p className="text-sm leading-6 text-white/60">
+                  Ahora mismo estas dentro como <span className="font-bold text-white">{currentEmail}</span>.
+                  Para entrar con otra cuenta, cierra esta sesion primero.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => { window.location.href = redirectTo; }}
+                disabled={loading}
+                className="w-full rounded-xl bg-white px-6 py-4 text-xs font-black uppercase tracking-widest text-orange-600 transition hover:bg-orange-50 disabled:opacity-50"
+              >
+                Continuar con esta cuenta
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSwitchAccount}
+                disabled={loading}
+                className="w-full rounded-xl border border-white/10 px-6 py-4 text-xs font-black uppercase tracking-widest text-white/70 transition hover:border-white/30 hover:text-white disabled:opacity-50"
+              >
+                {loading ? "Cerrando sesion..." : "Cerrar sesion y entrar con otra cuenta"}
+              </button>
+            </div>
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
               <div className="px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-xs text-center">
@@ -177,7 +235,9 @@ function LoginForm() {
               </div>
             </button>
           </form>
+          )}
 
+          {!currentEmail && (
           <div className="mt-8 text-center border-t border-white/5 pt-6">
             <button
               type="button"
@@ -187,6 +247,7 @@ function LoginForm() {
               {isLogin ? "¿No tienes cuenta? Regístrate" : "¿Ya tienes cuenta? Inicia sesión"}
             </button>
           </div>
+          )}
         </motion.div>
       </div>
     </div>

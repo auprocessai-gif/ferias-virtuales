@@ -82,7 +82,7 @@ export default function Navbar() {
     }
   };
 
-  if (pathname?.startsWith("/dashboard")) {
+  if (pathname?.startsWith("/dashboard") || pathname?.startsWith("/login")) {
     return null;
   }
 
