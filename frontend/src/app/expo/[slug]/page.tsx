@@ -19,15 +19,6 @@ interface PavilionNavItem {
   name: string;
 }
 
-interface StoredSession {
-  access_token?: string;
-  expires_at?: number;
-  user?: {
-    id?: string;
-    email?: string;
-  };
-}
-
 const withTimeout = async <T,>(promise: PromiseLike<T>, message: string, timeoutMs = 30000): Promise<T> => {
   let timeoutId: number | undefined;
 
@@ -46,44 +37,12 @@ const wait = (milliseconds: number) => new Promise<void>((resolve) => {
   window.setTimeout(resolve, milliseconds);
 });
 
-function readStoredSession(): StoredSession | null {
-  if (typeof window === "undefined") return null;
-
-  const authKeys = Object.keys(window.localStorage)
-    .filter((key) => key.startsWith("sb-") && key.endsWith("-auth-token"))
-    .sort((key) => key.includes("auprocessia-supabase") ? -1 : 1);
-
-  for (const key of authKeys) {
-    try {
-      const value = window.localStorage.getItem(key);
-      if (!value) continue;
-
-      const parsed = JSON.parse(value);
-      const session = (parsed?.currentSession || parsed) as StoredSession;
-      if (session?.access_token && session?.user?.id) return session;
-    } catch (error) {
-      console.warn("[expo] invalid stored auth session", error);
-    }
-  }
-
-  return null;
-}
-
 const getSessionResultWithRetry = async () => {
-  const storedSession = readStoredSession();
-  if (storedSession?.user?.id) {
-    return { data: { session: storedSession } };
-  }
-
   let lastError: unknown = null;
 
   for (let attempt = 0; attempt < 4; attempt += 1) {
     try {
-      const result = await withTimeout(
-        supabase.auth.getSession(),
-        "No se pudo comprobar la sesion.",
-        5000
-      );
+      const result = await supabase.auth.getSession();
 
       if (result.data.session?.user) return result;
     } catch (err) {
