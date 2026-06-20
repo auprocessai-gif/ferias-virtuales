@@ -15,21 +15,42 @@ export default function Home() {
   const [sessionReady, setSessionReady] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [currentEmail, setCurrentEmail] = useState<string | null>(null);
+  const [currentRole, setCurrentRole] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const syncSession = async (sessionUserId?: string, sessionEmail?: string | null) => {
       if (!mounted) return;
-      setIsSignedIn(Boolean(session?.user));
-      setCurrentEmail(session?.user?.email || null);
+
+      if (!sessionUserId) {
+        setIsSignedIn(false);
+        setCurrentEmail(null);
+        setCurrentRole(null);
+        setSessionReady(true);
+        return;
+      }
+
+      setIsSignedIn(true);
+      setCurrentEmail(sessionEmail || null);
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", sessionUserId)
+        .maybeSingle();
+
+      if (!mounted) return;
+      setCurrentRole(profile?.role || "participant");
       setSessionReady(true);
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      syncSession(session?.user?.id, session?.user?.email);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsSignedIn(Boolean(session?.user));
-      setCurrentEmail(session?.user?.email || null);
-      setSessionReady(true);
+      syncSession(session?.user?.id, session?.user?.email);
     });
 
     return () => {
@@ -68,7 +89,25 @@ export default function Home() {
         return;
       }
 
-      window.location.href = "/dashboard";
+      const userId = loginResult.data.user?.id;
+      const { data: profile } = userId
+        ? await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", userId)
+          .maybeSingle()
+        : { data: null };
+
+      if (profile?.role === "admin" || profile?.role === "manager") {
+        window.location.href = "/dashboard";
+        return;
+      }
+
+      setIsSignedIn(true);
+      setCurrentEmail(loginResult.data.user?.email || email);
+      setCurrentRole(profile?.role || "participant");
+      setError("Esta cuenta es de participante. Usa el enlace de la feria o cierra sesion para entrar con una cuenta de gestion.");
+      setLoading(false);
     } catch (loginError) {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
@@ -89,6 +128,7 @@ export default function Home() {
       await supabase.auth.signOut();
       setIsSignedIn(false);
       setCurrentEmail(null);
+      setCurrentRole(null);
       setEmail("");
       setPassword("");
     } catch (err: unknown) {
@@ -97,6 +137,8 @@ export default function Home() {
       setLoading(false);
     }
   };
+
+  const canOpenPanel = currentRole === "admin" || currentRole === "manager";
 
   return (
     <div className="relative min-h-[calc(100vh-64px)] overflow-hidden bg-[#050505] text-white">
@@ -165,16 +207,27 @@ export default function Home() {
                 <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">Sesion activa</p>
                 <p className="mt-2 text-sm leading-6 text-white/60">
                   Ahora estas dentro como <span className="font-bold text-white">{currentEmail || "usuario activo"}</span>.
+                  {currentRole && (
+                    <span className="ml-1 rounded border border-white/10 bg-white px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-orange-600">
+                      {currentRole}
+                    </span>
+                  )}
                 </p>
               </div>
 
-              <Link
-                href="/dashboard"
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-black transition hover:bg-white"
-              >
-                Ir a mi panel
-                <ArrowRight size={16} />
-              </Link>
+              {canOpenPanel ? (
+                <Link
+                  href="/dashboard"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-black transition hover:bg-white"
+                >
+                  Ir a mi panel
+                  <ArrowRight size={16} />
+                </Link>
+              ) : (
+                <div className="rounded-lg border border-orange-400/20 bg-orange-500/10 p-4 text-sm leading-6 text-orange-50/75">
+                  Esta cuenta es de participante. Los participantes no tienen panel de control y deben entrar desde el enlace exacto de su feria.
+                </div>
+              )}
 
               <button
                 type="button"
