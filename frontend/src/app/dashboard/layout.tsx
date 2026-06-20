@@ -7,36 +7,59 @@ import { supabase } from "@/lib/supabase";
 import { usePathname } from "next/navigation";
 
 const dashboardRoles = new Set(["admin", "manager"]);
-const DASHBOARD_AUTH_TIMEOUT_MS = 20000;
-type ProfileRoleResponse = { data: { role: string } | null; error: { message: string } | null };
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
-function withTimeout<T>(promise: PromiseLike<T>, label: string, timeoutMs = DASHBOARD_AUTH_TIMEOUT_MS): Promise<T> {
-  return Promise.race([
-    Promise.resolve(promise),
-    new Promise<T>((_, reject) => {
-      window.setTimeout(() => reject(new Error(`${label} timed out`)), timeoutMs);
-    }),
-  ]);
+interface StoredSession {
+  access_token?: string;
+  expires_at?: number;
+  user?: {
+    id?: string;
+  };
 }
 
-const wait = (milliseconds: number) => new Promise<void>((resolve) => {
-  window.setTimeout(resolve, milliseconds);
-});
+function readStoredSession(): StoredSession | null {
+  if (typeof window === "undefined") return null;
 
-async function retry<T>(factory: () => PromiseLike<T>, label: string, attempts = 3): Promise<T> {
-  let lastError: unknown = null;
+  const authKeys = Object.keys(window.localStorage)
+    .filter((key) => key.startsWith("sb-") && key.endsWith("-auth-token"))
+    .sort((key) => key.includes("auprocessia-supabase") ? -1 : 1);
 
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
+  for (const key of authKeys) {
     try {
-      return await withTimeout(factory(), label);
+      const value = window.localStorage.getItem(key);
+      if (!value) continue;
+
+      const parsed = JSON.parse(value);
+      const session = (parsed?.currentSession || parsed) as StoredSession;
+      if (session?.access_token && session?.user?.id) return session;
     } catch (error) {
-      lastError = error;
-      console.warn(`[dashboard] ${label} attempt ${attempt + 1} failed`, error);
-      await wait(700);
+      console.warn("[dashboard] invalid stored auth session", error);
     }
   }
 
-  throw lastError instanceof Error ? lastError : new Error(`${label} failed`);
+  return null;
+}
+
+async function fetchProfileRole(session: StoredSession): Promise<string | null> {
+  if (!supabaseUrl || !supabaseAnonKey || !session.user?.id || !session.access_token) return null;
+
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(session.user.id)}&select=role&limit=1`,
+    {
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Profile role request failed: ${response.status}`);
+  }
+
+  const profiles = await response.json() as Array<{ role?: string | null }>;
+  return profiles[0]?.role || null;
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -53,25 +76,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         setLoading(true);
         setAccessError(null);
 
-        const { data: { session } } = await supabase.auth.getSession();
+        const session = readStoredSession();
 
-        if (!session?.user) {
+        if (!session?.user?.id || !session.access_token) {
           window.location.href = `/login?redirect=${encodeURIComponent(pathname || "/dashboard")}`;
           return;
         }
 
-        const { data: profile, error: profileError } = await retry<ProfileRoleResponse>(
-          () => supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', session.user.id)
-            .maybeSingle() as unknown as PromiseLike<ProfileRoleResponse>,
-          "Dashboard profile check"
-        );
-
-        if (profileError) throw profileError;
-
-        const profileRole = profile?.role || "participant";
+        const profileRole = await fetchProfileRole(session) || "participant";
 
         if (!dashboardRoles.has(profileRole)) {
           if (mounted) {
