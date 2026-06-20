@@ -23,6 +23,16 @@ const wait = (milliseconds: number) => new Promise<void>((resolve) => {
   window.setTimeout(resolve, milliseconds);
 });
 
+async function resolveSession() {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) return session;
+    await wait(500);
+  }
+
+  return null;
+}
+
 async function retry<T>(factory: () => PromiseLike<T>, label: string, attempts = 3): Promise<T> {
   let lastError: unknown = null;
 
@@ -53,10 +63,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         setLoading(true);
         setAccessError(null);
 
-        const { data: { session } } = await supabase.auth.getSession();
+        const session = await resolveSession();
 
         if (!session?.user) {
-          window.location.href = `/login?redirect=${encodeURIComponent(pathname || "/dashboard")}`;
+          if (mounted) {
+            setAccessError("No hay una sesion activa para abrir el panel. Inicia sesion de nuevo como administrador o gestor.");
+          }
           return;
         }
 
@@ -121,6 +133,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Link href="/" className="rounded-xl bg-white px-5 py-3 text-[10px] font-black uppercase tracking-widest text-orange-600 transition hover:bg-orange-50">
             Volver a la feria
+          </Link>
+          <Link
+            href={`/login?redirect=${encodeURIComponent(pathname || "/dashboard")}`}
+            className="rounded-xl bg-primary px-5 py-3 text-[10px] font-black uppercase tracking-widest text-black transition hover:bg-white"
+          >
+            Iniciar sesion
           </Link>
           <button
             onClick={handleLogout}

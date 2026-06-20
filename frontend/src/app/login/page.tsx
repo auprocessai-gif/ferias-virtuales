@@ -40,7 +40,7 @@ function LoginForm() {
 
     supabase.auth.getSession()
       .then(({ data: { session } }) => {
-        if (mounted && session?.user) {
+        if (mounted && session?.user && !redirectTo.startsWith("/dashboard")) {
           window.location.href = redirectTo;
         }
       })
