@@ -19,6 +19,7 @@ export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
   const { reset, setView, setUserRole, userRole } = useFairStore();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [participantFairSlug, setParticipantFairSlug] = useState<string | null>(null);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -33,9 +34,36 @@ export default function Navbar() {
           .eq('id', currentUser.id)
           .single();
         
-        setUserRole(normalizeUserRole(profile?.role));
+        const role = normalizeUserRole(profile?.role);
+        setUserRole(role);
+
+        if (role === 'participant') {
+          const { data: participantAccess } = await supabase
+            .from("event_participants")
+            .select("event_id")
+            .eq("user_id", currentUser.id)
+            .in("status", ["registered", "approved"])
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (participantAccess?.event_id) {
+            const { data: event } = await supabase
+              .from("events")
+              .select("slug")
+              .eq("id", participantAccess.event_id)
+              .maybeSingle();
+
+            setParticipantFairSlug(event?.slug || null);
+          } else {
+            setParticipantFairSlug(null);
+          }
+        } else {
+          setParticipantFairSlug(null);
+        }
       } else {
         setUserRole(null);
+        setParticipantFairSlug(null);
       }
     };
 
@@ -52,9 +80,36 @@ export default function Navbar() {
           .eq('id', currentUser.id)
           .single();
         
-        setUserRole(normalizeUserRole(profile?.role));
+        const role = normalizeUserRole(profile?.role);
+        setUserRole(role);
+
+        if (role === 'participant') {
+          const { data: participantAccess } = await supabase
+            .from("event_participants")
+            .select("event_id")
+            .eq("user_id", currentUser.id)
+            .in("status", ["registered", "approved"])
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (participantAccess?.event_id) {
+            const { data: event } = await supabase
+              .from("events")
+              .select("slug")
+              .eq("id", participantAccess.event_id)
+              .maybeSingle();
+
+            setParticipantFairSlug(event?.slug || null);
+          } else {
+            setParticipantFairSlug(null);
+          }
+        } else {
+          setParticipantFairSlug(null);
+        }
       } else {
         setUserRole(null);
+        setParticipantFairSlug(null);
       }
     });
 
@@ -64,6 +119,7 @@ export default function Navbar() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUserRole(null);
+    setParticipantFairSlug(null);
     window.location.href = "/";
   };
 
@@ -87,6 +143,9 @@ export default function Navbar() {
   }
 
   const canOpenPanel = userRole === 'admin' || userRole === 'manager';
+  const pavilionHref = userRole === 'participant' && participantFairSlug
+    ? `/expo/${participantFairSlug}`
+    : "/";
 
   return (
     <header className="fixed top-2 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl h-16 rounded-2xl border border-white/20 bg-orange-600 backdrop-blur-3xl flex items-center px-8 justify-between shadow-[0_20px_50px_rgba(255,81,0,0.3)]">
@@ -102,7 +161,7 @@ export default function Navbar() {
       
       <nav className="hidden lg:flex items-center gap-10 text-[10px] font-black uppercase tracking-[0.3em] text-white">
         <Link 
-          href="/" 
+          href={pavilionHref} 
           onClick={handlePabellonRedirect}
           className="hover:opacity-60 transition-all hover:tracking-[0.4em] relative flex items-center gap-2 group"
         >

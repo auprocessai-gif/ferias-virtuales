@@ -16,6 +16,7 @@ export default function Home() {
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [currentEmail, setCurrentEmail] = useState<string | null>(null);
   const [currentRole, setCurrentRole] = useState<string | null>(null);
+  const [participantFairSlug, setParticipantFairSlug] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -27,6 +28,7 @@ export default function Home() {
         setIsSignedIn(false);
         setCurrentEmail(null);
         setCurrentRole(null);
+        setParticipantFairSlug(null);
         setSessionReady(true);
         return;
       }
@@ -41,7 +43,35 @@ export default function Home() {
         .maybeSingle();
 
       if (!mounted) return;
-      setCurrentRole(profile?.role || "participant");
+      const role = profile?.role || "participant";
+      setCurrentRole(role);
+
+      if (role !== "admin" && role !== "manager") {
+        const { data: participantAccess } = await supabase
+          .from("event_participants")
+          .select("event_id")
+          .eq("user_id", sessionUserId)
+          .in("status", ["registered", "approved"])
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (participantAccess?.event_id) {
+          const { data: event } = await supabase
+            .from("events")
+            .select("slug")
+            .eq("id", participantAccess.event_id)
+            .maybeSingle();
+
+          if (!mounted) return;
+          setParticipantFairSlug(event?.slug || null);
+        } else {
+          setParticipantFairSlug(null);
+        }
+      } else {
+        setParticipantFairSlug(null);
+      }
+
       setSessionReady(true);
     };
 
@@ -129,6 +159,7 @@ export default function Home() {
       setIsSignedIn(false);
       setCurrentEmail(null);
       setCurrentRole(null);
+      setParticipantFairSlug(null);
       setEmail("");
       setPassword("");
     } catch (err: unknown) {
@@ -139,6 +170,7 @@ export default function Home() {
   };
 
   const canOpenPanel = currentRole === "admin" || currentRole === "manager";
+  const participantFairHref = participantFairSlug ? `/expo/${participantFairSlug}` : "/login";
 
   return (
     <div className="relative min-h-[calc(100vh-64px)] overflow-hidden bg-[#050505] text-white">
@@ -224,8 +256,17 @@ export default function Home() {
                   <ArrowRight size={16} />
                 </Link>
               ) : (
-                <div className="rounded-lg border border-orange-400/20 bg-orange-500/10 p-4 text-sm leading-6 text-orange-50/75">
-                  Esta cuenta es de participante. Los participantes no tienen panel de control y deben entrar desde el enlace exacto de su feria.
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-orange-400/20 bg-orange-500/10 p-4 text-sm leading-6 text-orange-50/75">
+                    Esta cuenta es de participante. Los participantes no tienen panel de control.
+                  </div>
+                  <Link
+                    href={participantFairHref}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-black transition hover:bg-white"
+                  >
+                    {participantFairSlug ? "Entrar a mi feria" : "Abrir enlace de feria"}
+                    <ArrowRight size={16} />
+                  </Link>
                 </div>
               )}
 
