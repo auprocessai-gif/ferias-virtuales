@@ -30,7 +30,6 @@ function withTimeout<T>(promise: PromiseLike<T>, label: string, timeoutMs = DASH
 }
 
 export default function Dashboard() {
-  const [userEmail, setUserEmail] = useState("");
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     fairEntries: 0,
     standViews: 0,
@@ -39,12 +38,6 @@ export default function Dashboard() {
   });
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [loadingMetrics, setLoadingMetrics] = useState(true);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user?.email) setUserEmail(session.user.email);
-    });
-  }, []);
 
   useEffect(() => {
     async function loadRealMetrics() {
@@ -89,7 +82,7 @@ export default function Dashboard() {
       <header className="flex items-center justify-between">
         <div>
           <h1 className="mb-2 text-4xl font-black uppercase tracking-tight">
-            Bienvenido, {userEmail ? userEmail.split("@")[0] : "..."}
+            Bienvenido
           </h1>
           <p className="font-medium text-white/40">Panel de control de la Feria Virtual</p>
         </div>
@@ -100,7 +93,7 @@ export default function Dashboard() {
           </button>
           <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/5">
             <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20 text-xl font-black text-primary">
-              {userEmail?.charAt(0).toUpperCase() || "?"}
+              A
             </div>
           </div>
         </div>
