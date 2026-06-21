@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { User } from "@supabase/supabase-js";
-import { LogOut, User as UserIcon, ShieldCheck } from "lucide-react";
+import { AlertCircle, LogOut, ShieldCheck, User as UserIcon, X } from "lucide-react";
 import { usePresence } from "@/context/PresenceProvider";
 import { useFairStore, type UserRole } from "@/store/useFairStore";
 import { usePathname } from "next/navigation";
@@ -14,6 +14,12 @@ const normalizeUserRole = (role?: string | null): UserRole => (
   role === 'admin' || role === 'manager' ? role : 'participant'
 );
 
+type NavNotice = {
+  eyebrow: string;
+  title: string;
+  body: string;
+};
+
 export default function Navbar() {
   const pathname = usePathname();
   const { onlineUsers, isNexusConnected } = usePresence();
@@ -21,6 +27,7 @@ export default function Navbar() {
   const { reset, setView, setUserRole, userRole } = useFairStore();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [participantFairSlug, setParticipantFairSlug] = useState<string | null>(null);
+  const [notice, setNotice] = useState<NavNotice | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -126,15 +133,22 @@ export default function Navbar() {
     await supabase.auth.signOut();
     setUserRole(null);
     setParticipantFairSlug(null);
+    setNotice(null);
     window.location.href = "/";
   };
 
   const handlePabellonRedirect = (e: React.MouseEvent) => {
     if (userRole === 'participant' && !participantFairSlug && !window.location.pathname.startsWith('/expo/')) {
       e.preventDefault();
-      alert('Esta cuenta es de participante, pero todavia no tiene una feria asignada. Abre el enlace exacto de la feria o pide al organizador que te asigne acceso.');
+      setNotice({
+        eyebrow: "Acceso de participante",
+        title: "Feria no asignada",
+        body: "Esta cuenta aun no tiene una feria asociada. Abre el enlace exacto de tu feria o pide al organizador que active tu acceso.",
+      });
       return;
     }
+
+    setNotice(null);
 
     // Si estamos en una ruta de feria /expo/[slug], evitamos la recarga completa
     if (window.location.pathname.startsWith('/expo/')) {
@@ -160,6 +174,7 @@ export default function Navbar() {
     : "/";
 
   return (
+    <>
     <header className="fixed top-2 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl h-16 rounded-2xl border border-white/20 bg-orange-600 backdrop-blur-3xl flex items-center px-8 justify-between shadow-[0_20px_50px_rgba(255,81,0,0.3)]">
       <div className="flex items-center gap-3">
         <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shadow-lg">
@@ -177,7 +192,7 @@ export default function Navbar() {
           onClick={handlePabellonRedirect}
           className="hover:opacity-60 transition-all hover:tracking-[0.4em] relative flex items-center gap-2 group"
         >
-          Pabellón
+          Pabellon
           <div className="flex items-center gap-1.5 ml-1">
             {isNexusConnected ? (
               <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
@@ -202,8 +217,11 @@ export default function Navbar() {
         </button>
         <button 
           onClick={() => {
-            // Placeholder para Networking
-            alert('Networking próximamente disponible');
+            setNotice({
+              eyebrow: "Networking",
+              title: "Muy pronto",
+              body: "Estamos preparando esta zona para conectar participantes, gestores y stands dentro de cada feria.",
+            });
           }}
           className="hover:opacity-60 transition-all hover:tracking-[0.4em]"
         >
@@ -240,7 +258,7 @@ export default function Navbar() {
             <button 
               onClick={handleLogout}
               className="p-2 rounded-xl border border-white/10 text-white/40 hover:text-white hover:border-white/30 transition-all"
-              title="Cerrar Sesión"
+              title="Cerrar sesion"
             >
               <LogOut size={16} />
             </button>
@@ -257,5 +275,46 @@ export default function Navbar() {
         )}
       </div>
     </header>
+
+    {notice && (
+      <div className="fixed top-24 left-1/2 z-[70] w-[92%] max-w-md -translate-x-1/2 rounded-2xl border border-orange-400/30 bg-[#15100f]/95 p-5 text-white shadow-[0_24px_70px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
+        <div className="flex gap-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-600/20 text-orange-500 ring-1 ring-orange-500/30">
+            <AlertCircle size={20} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.32em] text-orange-500">
+                  {notice.eyebrow}
+                </p>
+                <h2 className="mt-1 text-xl font-black uppercase tracking-wide">
+                  {notice.title}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setNotice(null)}
+                className="rounded-lg border border-white/10 p-1.5 text-white/45 transition hover:border-white/25 hover:text-white"
+                aria-label="Cerrar aviso"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-white/70">
+              {notice.body}
+            </p>
+            <button
+              type="button"
+              onClick={() => setNotice(null)}
+              className="mt-4 w-full rounded-xl bg-white px-4 py-3 text-[11px] font-black uppercase tracking-[0.22em] text-orange-600 transition hover:bg-orange-50"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
