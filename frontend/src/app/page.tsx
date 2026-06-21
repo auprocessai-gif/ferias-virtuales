@@ -119,8 +119,53 @@ export default function Home() {
 
     const { data: { session: currentSession } } = await getSessionWithTimeout("Home login session check");
     if (currentSession?.user) {
-      setCurrentEmail(currentSession.user.email || "usuario activo");
       setIsSignedIn(true);
+      setCurrentEmail(currentSession.user.email || "usuario activo");
+
+      const { data: profile } = await withTimeout(
+        supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", currentSession.user.id)
+          .maybeSingle(),
+        "No se pudo comprobar el rol del usuario."
+      );
+
+      const role = profile?.role || "participant";
+      setCurrentRole(role);
+
+      if (role !== "admin" && role !== "manager") {
+        const { data: participantAccess } = await withTimeout(
+          supabase
+            .from("event_participants")
+            .select("event_id")
+            .eq("user_id", currentSession.user.id)
+            .in("status", ["registered", "approved"])
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          "No se pudo comprobar la feria asignada."
+        );
+
+        if (participantAccess?.event_id) {
+          const { data: event } = await withTimeout(
+            supabase
+              .from("events")
+              .select("slug")
+              .eq("id", participantAccess.event_id)
+              .maybeSingle(),
+            "No se pudo cargar la feria asignada."
+          );
+
+          setParticipantFairSlug(event?.slug || null);
+        } else {
+          setParticipantFairSlug(null);
+        }
+      } else {
+        setParticipantFairSlug(null);
+      }
+
+      setSessionReady(true);
       setLoading(false);
       return;
     }

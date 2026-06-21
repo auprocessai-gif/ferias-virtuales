@@ -109,6 +109,51 @@ export default function FairExpoPage() {
         const visibility = event.visibility || "public";
         const registrationMode = event.registration_mode || "open";
 
+        const loadPavilions = async () => {
+          const { data: pavilionsData, error: pavErr } = await withTimeout(
+            supabase
+              .from("pavilions")
+              .select("*")
+              .eq("event_id", event.id)
+              .order("created_at", { ascending: true }),
+            "No se pudieron cargar los pabellones."
+          );
+
+          if (pavErr) throw pavErr;
+
+          if (pavilionsData && pavilionsData.length > 0) {
+            setPavilions(pavilionsData);
+            setActivePavilionId((current) => current || pavilionsData[0].id);
+          }
+        };
+
+        const { data: profile, error: profileErr } = await withTimeout(
+          supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", session.user.id)
+            .maybeSingle(),
+          "No se pudo comprobar tu rol de acceso."
+        );
+
+        if (profileErr) {
+          console.warn("[access] profile role check failed", profileErr.message);
+        }
+
+        const userRole = profile?.role || "participant";
+        const isManagementUser = userRole === "admin" || userRole === "manager";
+
+        if (isManagementUser) {
+          setAccessStatus("granted");
+          trackAnalyticsEvent({
+            eventId: event.id,
+            action: "fair_entered",
+            metadata: { slug, role: userRole },
+          });
+          await loadPavilions();
+          return;
+        }
+
         const { data: participant, error: participantErr } = await withTimeout(
           supabase
             .from("event_participants")
@@ -266,21 +311,7 @@ export default function FairExpoPage() {
           metadata: { slug },
         });
 
-        const { data: pavilionsData, error: pavErr } = await withTimeout(
-          supabase
-            .from("pavilions")
-            .select("*")
-            .eq("event_id", event.id)
-            .order("created_at", { ascending: true }),
-          "No se pudieron cargar los pabellones."
-        );
-
-        if (pavErr) throw pavErr;
-
-        if (pavilionsData && pavilionsData.length > 0) {
-          setPavilions(pavilionsData);
-          setActivePavilionId((current) => current || pavilionsData[0].id);
-        }
+        await loadPavilions();
       } catch (err: unknown) {
         console.error("Error loading fair:", err);
         setAccessStatus("denied");
