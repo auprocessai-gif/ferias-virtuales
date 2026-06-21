@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { getSessionWithTimeout, withTimeout } from "@/lib/supabaseAuth";
 
 export type AnalyticsAction =
   | "fair_entered"
@@ -27,20 +28,28 @@ export async function trackAnalyticsEvent({
 }: TrackAnalyticsInput) {
   if (!eventId) return;
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.user) return;
+  try {
+    const { data: { session } } = await getSessionWithTimeout("Analytics session check");
+    if (!session?.user) return;
 
-  const { error } = await supabase.from("analytics_events").insert({
-    event_id: eventId,
-    pavilion_id: pavilionId ?? null,
-    stand_id: standId ?? null,
-    user_id: session.user.id,
-    event_type: action,
-    action,
-    metadata,
-  });
+    const { error } = await withTimeout(
+      supabase.from("analytics_events").insert({
+        event_id: eventId,
+        pavilion_id: pavilionId ?? null,
+        stand_id: standId ?? null,
+        user_id: session.user.id,
+        event_type: action,
+        action,
+        metadata,
+      }),
+      "Analytics insert timed out",
+      5000
+    );
 
-  if (error) {
-    console.warn("[analytics] event not recorded", error.message);
+    if (error) {
+      console.warn("[analytics] event not recorded", error.message);
+    }
+  } catch (error) {
+    console.warn("[analytics] skipped", error);
   }
 }

@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Building2, Lock, Mail, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { getSessionWithTimeout, withTimeout } from "@/lib/supabaseAuth";
 
 export default function Home() {
   const [email, setEmail] = useState("");
@@ -36,32 +37,41 @@ export default function Home() {
       setIsSignedIn(true);
       setCurrentEmail(sessionEmail || null);
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", sessionUserId)
-        .maybeSingle();
+      const { data: profile } = await withTimeout(
+        supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", sessionUserId)
+          .maybeSingle(),
+        "No se pudo comprobar el rol del usuario."
+      );
 
       if (!mounted) return;
       const role = profile?.role || "participant";
       setCurrentRole(role);
 
       if (role !== "admin" && role !== "manager") {
-        const { data: participantAccess } = await supabase
-          .from("event_participants")
-          .select("event_id")
-          .eq("user_id", sessionUserId)
-          .in("status", ["registered", "approved"])
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        const { data: participantAccess } = await withTimeout(
+          supabase
+            .from("event_participants")
+            .select("event_id")
+            .eq("user_id", sessionUserId)
+            .in("status", ["registered", "approved"])
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          "No se pudo comprobar la feria asignada."
+        );
 
         if (participantAccess?.event_id) {
-          const { data: event } = await supabase
-            .from("events")
-            .select("slug")
-            .eq("id", participantAccess.event_id)
-            .maybeSingle();
+          const { data: event } = await withTimeout(
+            supabase
+              .from("events")
+              .select("slug")
+              .eq("id", participantAccess.event_id)
+              .maybeSingle(),
+            "No se pudo cargar la feria asignada."
+          );
 
           if (!mounted) return;
           setParticipantFairSlug(event?.slug || null);
@@ -75,16 +85,29 @@ export default function Home() {
       setSessionReady(true);
     };
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      syncSession(session?.user?.id, session?.user?.email);
+    getSessionWithTimeout("Home session check").then(({ data: { session } }) => {
+      syncSession(session?.user?.id, session?.user?.email).catch((error) => {
+        console.warn("[home] session sync failed", error);
+        syncSession(undefined, null);
+      });
+    }).catch(() => {
+      syncSession(undefined, null);
     });
 
+    let authRefreshTimer: number | undefined;
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      syncSession(session?.user?.id, session?.user?.email);
+      if (authRefreshTimer) window.clearTimeout(authRefreshTimer);
+      authRefreshTimer = window.setTimeout(() => {
+        syncSession(session?.user?.id, session?.user?.email).catch((error) => {
+          console.warn("[home] auth state sync failed", error);
+          syncSession(undefined, null);
+        });
+      }, 0);
     });
 
     return () => {
       mounted = false;
+      if (authRefreshTimer) window.clearTimeout(authRefreshTimer);
       subscription.unsubscribe();
     };
   }, []);
@@ -94,7 +117,7 @@ export default function Home() {
     setLoading(true);
     setError(null);
 
-    const { data: { session: currentSession } } = await supabase.auth.getSession();
+    const { data: { session: currentSession } } = await getSessionWithTimeout("Home login session check");
     if (currentSession?.user) {
       setCurrentEmail(currentSession.user.email || "usuario activo");
       setIsSignedIn(true);
@@ -121,11 +144,14 @@ export default function Home() {
 
       const userId = loginResult.data.user?.id;
       const { data: profile } = userId
-        ? await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", userId)
-          .maybeSingle()
+        ? await withTimeout(
+          supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", userId)
+            .maybeSingle(),
+          "No se pudo comprobar el rol del usuario."
+        )
         : { data: null };
 
       if (profile?.role === "admin" || profile?.role === "manager") {
@@ -139,7 +165,7 @@ export default function Home() {
       setError("Esta cuenta es de participante. Usa el enlace de la feria o cierra sesion para entrar con una cuenta de gestion.");
       setLoading(false);
     } catch (loginError) {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await getSessionWithTimeout("Home recovery session check");
       if (session?.user) {
         window.location.href = "/dashboard";
         return;

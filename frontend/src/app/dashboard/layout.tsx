@@ -5,6 +5,7 @@ import Link from "next/link";
 import { LayoutDashboard, LogOut, Settings, Briefcase, Inbox } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { usePathname } from "next/navigation";
+import { getSessionWithTimeout } from "@/lib/supabaseAuth";
 
 const dashboardRoles = new Set(["admin", "manager"]);
 const DASHBOARD_AUTH_TIMEOUT_MS = 20000;
@@ -25,8 +26,13 @@ const wait = (milliseconds: number) => new Promise<void>((resolve) => {
 
 async function resolveSession() {
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) return session;
+    try {
+      const { data: { session } } = await getSessionWithTimeout("Dashboard session check");
+      if (session?.user) return session;
+    } catch (error) {
+      console.warn(`[dashboard] session attempt ${attempt + 1} failed`, error);
+    }
+
     await wait(500);
   }
 

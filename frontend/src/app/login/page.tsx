@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Lock, Mail, ArrowRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useSearchParams } from "next/navigation";
+import { getSessionWithTimeout } from "@/lib/supabaseAuth";
 
 const AUTH_TIMEOUT_MS = 12000;
 
@@ -39,7 +40,7 @@ function LoginForm() {
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession()
+    getSessionWithTimeout("Login session check")
       .then(({ data: { session } }) => {
         if (!mounted || !session?.user) return;
 
@@ -64,7 +65,7 @@ function LoginForm() {
     setError(null);
 
     try {
-      await supabase.auth.signOut();
+      await withTimeout(supabase.auth.signOut(), "Logout", 8000);
       setCurrentEmail(null);
       setEmail("");
       setPassword("");

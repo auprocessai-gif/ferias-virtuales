@@ -12,6 +12,7 @@ import { useFairStore } from "@/store/useFairStore";
 import { Stand } from "@/../../shared";
 import { Map as MapIcon } from "lucide-react";
 import { trackAnalyticsEvent } from "@/lib/analytics";
+import { getSessionWithRetry } from "@/lib/supabaseAuth";
 
 type AccessStatus = "checking" | "granted" | "pending" | "denied";
 interface PavilionNavItem {
@@ -31,30 +32,6 @@ const withTimeout = async <T,>(promise: PromiseLike<T>, message: string, timeout
   } finally {
     if (timeoutId) window.clearTimeout(timeoutId);
   }
-};
-
-const wait = (milliseconds: number) => new Promise<void>((resolve) => {
-  window.setTimeout(resolve, milliseconds);
-});
-
-const getSessionResultWithRetry = async () => {
-  let lastError: unknown = null;
-
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    try {
-      const result = await supabase.auth.getSession();
-
-      if (result.data.session?.user) return result;
-    } catch (err) {
-      lastError = err;
-      console.warn(`[expo] session check attempt ${attempt + 1} failed`, err);
-    }
-
-    await wait(700);
-  }
-
-  if (lastError) throw lastError;
-  return { data: { session: null } };
 };
 
 export default function FairExpoPage() {
@@ -102,7 +79,7 @@ export default function FairExpoPage() {
         setError(null);
         setAccessStatus("checking");
 
-        const { data: { session } } = await getSessionResultWithRetry();
+        const { data: { session } } = await getSessionWithRetry(2);
         if (!session?.user) {
           const search = typeof window !== "undefined" ? window.location.search : "";
           router.replace(`/login?redirect=${encodeURIComponent(`/expo/${slug}${search}`)}`);

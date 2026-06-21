@@ -8,6 +8,7 @@ import { LogOut, User as UserIcon, ShieldCheck } from "lucide-react";
 import { usePresence } from "@/context/PresenceProvider";
 import { useFairStore, type UserRole } from "@/store/useFairStore";
 import { usePathname } from "next/navigation";
+import { getSessionWithTimeout, withTimeout } from "@/lib/supabaseAuth";
 
 const normalizeUserRole = (role?: string | null): UserRole => (
   role === 'admin' || role === 'manager' ? role : 'participant'
@@ -22,98 +23,103 @@ export default function Navbar() {
   const [participantFairSlug, setParticipantFairSlug] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const currentUser = session?.user ?? null;
+    let mounted = true;
+    let authRefreshTimer: number | undefined;
+
+    const loadUserAccess = async (sessionUser?: User | null) => {
+      if (!mounted) return;
+      const currentUser = sessionUser ?? null;
       setUser(currentUser);
 
-      if (currentUser) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', currentUser.id)
-          .single();
-        
+      if (!currentUser) {
+        setUserRole(null);
+        setParticipantFairSlug(null);
+        return;
+      }
+
+      try {
+        const { data: profile } = await withTimeout(
+          supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', currentUser.id)
+            .maybeSingle(),
+          "No se pudo comprobar el rol del usuario."
+        );
+
+        if (!mounted) return;
         const role = normalizeUserRole(profile?.role);
         setUserRole(role);
 
-        if (role === 'participant') {
-          const { data: participantAccess } = await supabase
+        if (role !== 'participant') {
+          setParticipantFairSlug(null);
+          return;
+        }
+
+        const { data: participantAccess } = await withTimeout(
+          supabase
             .from("event_participants")
             .select("event_id")
             .eq("user_id", currentUser.id)
             .in("status", ["registered", "approved"])
             .order("created_at", { ascending: false })
             .limit(1)
-            .maybeSingle();
+            .maybeSingle(),
+          "No se pudo comprobar la feria asignada."
+        );
 
-          if (participantAccess?.event_id) {
-            const { data: event } = await supabase
-              .from("events")
-              .select("slug")
-              .eq("id", participantAccess.event_id)
-              .maybeSingle();
+        if (!mounted) return;
+        if (!participantAccess?.event_id) {
+          setParticipantFairSlug(null);
+          return;
+        }
 
-            setParticipantFairSlug(event?.slug || null);
-          } else {
-            setParticipantFairSlug(null);
-          }
-        } else {
+        const { data: event } = await withTimeout(
+          supabase
+            .from("events")
+            .select("slug")
+            .eq("id", participantAccess.event_id)
+            .maybeSingle(),
+          "No se pudo cargar la feria asignada."
+        );
+
+        if (mounted) setParticipantFairSlug(event?.slug || null);
+      } catch (error) {
+        console.warn("[navbar] user access check failed", error);
+        if (mounted) {
+          setUserRole(currentUser ? "participant" : null);
           setParticipantFairSlug(null);
         }
-      } else {
-        setUserRole(null);
-        setParticipantFairSlug(null);
       }
     };
 
-    checkUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const checkUser = async () => {
+      const { data: { session } } = await getSessionWithTimeout("Navbar session check");
       const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      
-      if (currentUser) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', currentUser.id)
-          .single();
-        
-        const role = normalizeUserRole(profile?.role);
-        setUserRole(role);
+      await loadUserAccess(currentUser);
+    };
 
-        if (role === 'participant') {
-          const { data: participantAccess } = await supabase
-            .from("event_participants")
-            .select("event_id")
-            .eq("user_id", currentUser.id)
-            .in("status", ["registered", "approved"])
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (participantAccess?.event_id) {
-            const { data: event } = await supabase
-              .from("events")
-              .select("slug")
-              .eq("id", participantAccess.event_id)
-              .maybeSingle();
-
-            setParticipantFairSlug(event?.slug || null);
-          } else {
-            setParticipantFairSlug(null);
-          }
-        } else {
-          setParticipantFairSlug(null);
-        }
-      } else {
+    checkUser().catch((error) => {
+      console.warn("[navbar] session check failed", error);
+      if (mounted) {
+        setUser(null);
         setUserRole(null);
         setParticipantFairSlug(null);
       }
     });
 
-    return () => subscription.unsubscribe();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (authRefreshTimer) window.clearTimeout(authRefreshTimer);
+      authRefreshTimer = window.setTimeout(() => {
+        loadUserAccess(session?.user ?? null);
+      }, 0);
+    });
+
+    return () => {
+      mounted = false;
+      if (authRefreshTimer) window.clearTimeout(authRefreshTimer);
+      subscription.unsubscribe();
+    };
   }, [setUserRole]);
 
   const handleLogout = async () => {
