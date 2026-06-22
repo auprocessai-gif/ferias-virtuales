@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, BarChart3, Bot, Building2, CheckCircle2, ClipboardList, Clock, Eye, Lightbulb, Loader2, MousePointerClick, PlusCircle, Send, ShieldAlert, Store, Target, Trophy, Users } from "lucide-react";
+import { Activity, ArrowLeft, BarChart3, Bot, Building2, CheckCircle2, ClipboardList, Clock, Eye, Lightbulb, Loader2, MousePointerClick, PlusCircle, Send, ShieldAlert, Store, Target, Trophy, UserRound, Users } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 interface FairSummary {
@@ -50,6 +50,17 @@ interface StandLead {
   action: string;
   created_at: string;
   metadata: Record<string, unknown> | null;
+}
+
+interface ParticipantActivity {
+  id: string;
+  user_id: string | null;
+  action: string;
+  created_at: string;
+  metadata: Record<string, unknown> | null;
+  profiles?: { email?: string | null } | Array<{ email?: string | null }> | null;
+  stands?: { title?: string | null } | Array<{ title?: string | null }> | null;
+  pavilions?: { name?: string | null } | Array<{ name?: string | null }> | null;
 }
 
 interface AnalyticsInsights {
@@ -103,6 +114,16 @@ type AdminAssistantMessage = {
   role: "user" | "assistant";
   content: string;
 };
+
+type ActivityFilter = "all" | "stand_viewed" | "pavilion_entered" | "fair_entered" | "auditorium_entered";
+
+const activityFilters: Array<{ value: ActivityFilter; label: string }> = [
+  { value: "all", label: "Todo" },
+  { value: "stand_viewed", label: "Stands" },
+  { value: "pavilion_entered", label: "Pabellones" },
+  { value: "fair_entered", label: "Feria" },
+  { value: "auditorium_entered", label: "Auditorio" },
+];
 
 const adminSuggestions = [
   "Que stand debo potenciar primero?",
@@ -246,6 +267,8 @@ export default function FairAnalyticsPage() {
   const [stands, setStands] = useState<StandSummary[]>([]);
   const [standContacts, setStandContacts] = useState<StandContact[]>([]);
   const [leads, setLeads] = useState<StandLead[]>([]);
+  const [activityEvents, setActivityEvents] = useState<ParticipantActivity[]>([]);
+  const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
   const [tasks, setTasks] = useState<ExhibitorTask[]>([]);
   const [opportunities, setOpportunities] = useState<CommercialOpportunity[]>([]);
   const [insights, setInsights] = useState<AnalyticsInsights | null>(null);
@@ -272,6 +295,7 @@ export default function FairAnalyticsPage() {
           { data: leadData, error: leadErr },
           { data: contactData, error: contactErr },
           { data: opportunityData, error: opportunityErr },
+          { data: activityData, error: activityErr },
         ] = await Promise.all([
           supabase.from("fair_analytics_summary").select("*").eq("event_id", fairId).maybeSingle(),
           supabase.from("pavilion_analytics_summary").select("*").eq("event_id", fairId).order("visits", { ascending: false }),
@@ -299,6 +323,12 @@ export default function FairAnalyticsPage() {
             .eq("event_id", fairId)
             .order("updated_at", { ascending: false })
             .limit(100),
+          supabase
+            .from("analytics_events")
+            .select("id,user_id,action,metadata,created_at,profiles(email),stands(title),pavilions(name)")
+            .eq("event_id", fairId)
+            .order("created_at", { ascending: false })
+            .limit(120),
         ]);
 
         if (summaryErr) throw summaryErr;
@@ -308,12 +338,14 @@ export default function FairAnalyticsPage() {
         if (leadErr) throw leadErr;
         if (contactErr) throw contactErr;
         if (opportunityErr) throw opportunityErr;
+        if (activityErr) throw activityErr;
 
         setSummary(fairSummary);
         setPavilions(pavilionData || []);
         setStands(standData || []);
         setStandContacts((contactData || []) as StandContact[]);
         setLeads((leadData || []) as StandLead[]);
+        setActivityEvents((activityData || []) as ParticipantActivity[]);
         setTasks((taskData || []) as ExhibitorTask[]);
         setOpportunities((opportunityData || []) as CommercialOpportunity[]);
 
@@ -344,6 +376,7 @@ export default function FairAnalyticsPage() {
   const meetings = opportunities.filter((opportunity) => opportunity.status === "meeting_scheduled").length;
   const wonDeals = opportunities.filter((opportunity) => opportunity.status === "won").length;
   const pipelineConversion = opportunities.length > 0 ? Math.round(((meetings + wonDeals) / opportunities.length) * 100) : 0;
+  const visibleActivity = activityEvents.filter((event) => activityFilter === "all" || event.action === activityFilter);
 
   const createTaskFromAlert = async (alert: CommercialAlert) => {
     if (!alert.can_create_task || creatingAlertTaskId) return;
@@ -656,8 +689,140 @@ export default function FairAnalyticsPage() {
           <Ranking rows={stands.map((item) => ({ id: item.stand_id, name: item.stand_title, main: item.views, sub: `${item.unique_visitors} unicos - ${item.leads} leads` }))} empty="Todavia no hay visitas a stands." />
         </section>
       </div>
+
+      <section className="glass rounded-[2rem] border border-white/5 p-8">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-primary p-3 text-black">
+              <Activity size={20} />
+            </div>
+            <div>
+              <h2 className="text-sm font-black uppercase tracking-widest">Actividad por participante</h2>
+              <p className="text-sm text-white/40">Quien ha entrado, que stand ha visto y en que momento</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {activityFilters.map((filter) => (
+              <button
+                key={filter.value}
+                onClick={() => setActivityFilter(filter.value)}
+                className={`rounded-full border px-3 py-2 text-[9px] font-black uppercase tracking-widest transition ${
+                  activityFilter === filter.value
+                    ? "border-primary bg-primary text-black"
+                    : "border-white/10 bg-white/[0.04] text-white/45 hover:border-primary/50 hover:text-white"
+                }`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <ParticipantActivityList events={visibleActivity} />
+      </section>
     </div>
   );
+}
+
+function ParticipantActivityList({ events }: { events: ParticipantActivity[] }) {
+  if (events.length === 0) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-black/25 p-6 text-sm text-white/35">
+        Todavia no hay actividad individual con este filtro.
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/25">
+      <div className="grid grid-cols-[1.2fr_1fr_1fr_auto] gap-4 border-b border-white/10 px-5 py-3 text-[9px] font-black uppercase tracking-widest text-white/35 max-md:hidden">
+        <span>Participante</span>
+        <span>Actividad</span>
+        <span>Destino</span>
+        <span>Hora</span>
+      </div>
+      <div className="divide-y divide-white/10">
+        {events.map((event) => (
+          <article key={event.id} className="grid grid-cols-[1.2fr_1fr_1fr_auto] gap-4 px-5 py-4 max-md:grid-cols-1">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-primary">
+                <UserRound size={16} />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-black text-white">{getActivityUser(event)}</p>
+                <p className="truncate text-[10px] font-bold uppercase tracking-widest text-white/25">{event.user_id || "sin id"}</p>
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-white">{getActivityLabel(event.action)}</p>
+              <p className="mt-1 text-xs text-white/35">{getActivityHint(event.action)}</p>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-white/75">{getActivityTarget(event)}</p>
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-primary/70">{event.action.replaceAll("_", " ")}</p>
+            </div>
+            <p className="whitespace-nowrap text-right text-xs font-bold uppercase tracking-widest text-white/35 max-md:text-left">
+              {new Date(event.created_at).toLocaleString()}
+            </p>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function firstRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? value[0] || null : value;
+}
+
+function getActivityUser(event: ParticipantActivity) {
+  const profile = firstRelation(event.profiles);
+  return profile?.email || "Participante sin email";
+}
+
+function getActivityLabel(action: string) {
+  const labels: Record<string, string> = {
+    fair_entered: "Entro en la feria",
+    pavilion_entered: "Entro en pabellon",
+    stand_viewed: "Visito un stand",
+    auditorium_entered: "Entro al auditorio",
+    stand_cta_clicked: "Pulso una llamada a la accion",
+    document_opened: "Abrio un documento",
+    video_played: "Reprodujo un video",
+    chat_message_sent: "Escribio en el chat",
+  };
+
+  return labels[action] || action.replaceAll("_", " ");
+}
+
+function getActivityHint(action: string) {
+  const hints: Record<string, string> = {
+    fair_entered: "Acceso general",
+    pavilion_entered: "Navegacion",
+    stand_viewed: "Interes en expositor",
+    auditorium_entered: "Contenido en directo",
+    stand_cta_clicked: "Lead potencial",
+    document_opened: "Interes en material",
+    video_played: "Consumo de contenido",
+    chat_message_sent: "Interaccion directa",
+  };
+
+  return hints[action] || "Actividad registrada";
+}
+
+function getActivityTarget(event: ParticipantActivity) {
+  const stand = firstRelation(event.stands);
+  const pavilion = firstRelation(event.pavilions);
+
+  if (stand?.title) return stand.title;
+  if (pavilion?.name) return pavilion.name;
+  if (event.action === "fair_entered") return "Entrada principal";
+  if (event.action === "auditorium_entered") return "Auditorio";
+
+  const metadata = event.metadata || {};
+  const metadataTitle = metadata.standTitle || metadata.pavilionName || metadata.title;
+  return typeof metadataTitle === "string" ? metadataTitle : "Sin destino asociado";
 }
 
 function InsightList({ title, icon, items }: { title: string; icon: ReactNode; items: string[] }) {
