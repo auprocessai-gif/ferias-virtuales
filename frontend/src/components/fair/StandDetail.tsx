@@ -56,6 +56,7 @@ export default function StandDetail({ stand, onClose }: StandDetailProps) {
   const [documentSyncMessage, setDocumentSyncMessage] = useState<string | null>(null);
   const socialRef = useRef<HTMLDivElement | null>(null);
   const assistantRef = useRef<HTMLDivElement | null>(null);
+  const viewedStandRef = useRef<string | null>(null);
   const { updateStatus } = usePresence();
   const { userRole } = useFairStore();
   const canManageStandDocuments = userRole === "admin" || userRole === "manager";
@@ -66,11 +67,28 @@ export default function StandDetail({ stand, onClose }: StandDetailProps) {
     return () => updateStatus('active');
   }, [stand.id, updateStatus]);
 
+  useEffect(() => {
+    if (viewedStandRef.current === stand.id) return;
+    viewedStandRef.current = stand.id;
+
+    trackAnalyticsEvent({
+      eventId: stand.event_id,
+      pavilionId: stand.pavilion_id ?? null,
+      standId: stand.id,
+      action: "stand_viewed",
+      metadata: {
+        title: stand.title,
+        source: "stand_detail",
+      },
+    });
+  }, [stand.event_id, stand.id, stand.pavilion_id, stand.title]);
+
   const recordStandAction = async (action: string, metadata: Record<string, unknown> = {}) => {
     const { data: { session } } = await supabase.auth.getSession();
 
     trackAnalyticsEvent({
       eventId: stand.event_id,
+      pavilionId: stand.pavilion_id ?? null,
       standId: stand.id,
       action: action === "document_opened" ? "document_opened" : "stand_cta_clicked",
       metadata,

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getEvents, getEventBySlug, getPavilionsByEvent, getStandsByEvent, getStandDetail } from '../controllers/fairController';
 import { askAnalyticsAssistant, askExhibitorAssistant, askFairAssistant, askStandAssistant, getAnalyticsInsights, getFairAssistantSuggestions } from '../controllers/assistantController';
 import { syncStandDocuments } from '../controllers/documentController';
+import { trackAnalyticsEvent } from '../controllers/analyticsController';
 
 const router = Router();
 
@@ -11,6 +12,7 @@ router.get('/events/slug/:slug/assistant/suggestions', getFairAssistantSuggestio
 router.post('/events/slug/:slug/assistant', askFairAssistant);
 router.get('/events/:eventId/analytics/insights', getAnalyticsInsights);
 router.post('/events/:eventId/analytics/assistant', askAnalyticsAssistant);
+router.post('/analytics/track', trackAnalyticsEvent);
 router.post('/events/:eventId/exhibitor/assistant', askExhibitorAssistant);
 router.get('/events/:eventId/pavilions', getPavilionsByEvent);
 router.get('/events/:eventId/stands', getStandsByEvent);

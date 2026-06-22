@@ -30,7 +30,31 @@ export async function trackAnalyticsEvent({
 
   try {
     const { data: { session } } = await getSessionWithTimeout("Analytics session check");
-    if (!session?.user) return;
+    if (!session?.user || !session.access_token) return;
+
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+    const apiResponse = await withTimeout(
+      fetch(`${apiBaseUrl}/analytics/track`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          eventId,
+          pavilionId: pavilionId ?? null,
+          standId: standId ?? null,
+          action,
+          metadata,
+        }),
+      }),
+      "Analytics API insert timed out",
+      5000
+    );
+
+    if (apiResponse.ok) return;
+
+    console.warn("[analytics] backend event not recorded", apiResponse.status);
 
     const { error } = await withTimeout(
       supabase.from("analytics_events").insert({
