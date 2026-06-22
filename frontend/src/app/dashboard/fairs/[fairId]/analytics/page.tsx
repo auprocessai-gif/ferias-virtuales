@@ -58,9 +58,9 @@ interface ParticipantActivity {
   action: string;
   created_at: string;
   metadata: Record<string, unknown> | null;
-  profiles?: { email?: string | null } | Array<{ email?: string | null }> | null;
-  stands?: { title?: string | null } | Array<{ title?: string | null }> | null;
-  pavilions?: { name?: string | null } | Array<{ name?: string | null }> | null;
+  user_email?: string | null;
+  stand_title?: string | null;
+  pavilion_name?: string | null;
 }
 
 interface AnalyticsInsights {
@@ -325,7 +325,7 @@ export default function FairAnalyticsPage() {
             .limit(100),
           supabase
             .from("analytics_events")
-            .select("id,user_id,action,metadata,created_at,profiles(email),stands(title),pavilions(name)")
+            .select("id,user_id,stand_id,pavilion_id,action,metadata,created_at")
             .eq("event_id", fairId)
             .order("created_at", { ascending: false })
             .limit(120),
@@ -345,7 +345,37 @@ export default function FairAnalyticsPage() {
         setStands(standData || []);
         setStandContacts((contactData || []) as StandContact[]);
         setLeads((leadData || []) as StandLead[]);
-        setActivityEvents((activityData || []) as ParticipantActivity[]);
+        const rawActivity = (activityData || []) as Array<ParticipantActivity & { stand_id?: string | null; pavilion_id?: string | null }>;
+        const userIds = Array.from(new Set(rawActivity.map((event) => event.user_id).filter(Boolean))) as string[];
+        const activityStandIds = Array.from(new Set(rawActivity.map((event) => event.stand_id).filter(Boolean))) as string[];
+        const activityPavilionIds = Array.from(new Set(rawActivity.map((event) => event.pavilion_id).filter(Boolean))) as string[];
+
+        const [
+          { data: activityProfiles },
+          { data: activityStands },
+          { data: activityPavilions },
+        ] = await Promise.all([
+          userIds.length > 0
+            ? supabase.from("profiles").select("id,email").in("id", userIds)
+            : Promise.resolve({ data: [] }),
+          activityStandIds.length > 0
+            ? supabase.from("stands").select("id,title").in("id", activityStandIds)
+            : Promise.resolve({ data: [] }),
+          activityPavilionIds.length > 0
+            ? supabase.from("pavilions").select("id,name").in("id", activityPavilionIds)
+            : Promise.resolve({ data: [] }),
+        ]);
+
+        const emailByUserId = new Map((activityProfiles || []).map((profile) => [profile.id, profile.email]));
+        const titleByStandId = new Map((activityStands || []).map((stand) => [stand.id, stand.title]));
+        const nameByPavilionId = new Map((activityPavilions || []).map((pavilion) => [pavilion.id, pavilion.name]));
+
+        setActivityEvents(rawActivity.map((event) => ({
+          ...event,
+          user_email: event.user_id ? emailByUserId.get(event.user_id) || null : null,
+          stand_title: event.stand_id ? titleByStandId.get(event.stand_id) || null : null,
+          pavilion_name: event.pavilion_id ? nameByPavilionId.get(event.pavilion_id) || null : null,
+        })));
         setTasks((taskData || []) as ExhibitorTask[]);
         setOpportunities((opportunityData || []) as CommercialOpportunity[]);
 
@@ -771,14 +801,8 @@ function ParticipantActivityList({ events }: { events: ParticipantActivity[] }) 
   );
 }
 
-function firstRelation<T>(value: T | T[] | null | undefined): T | null {
-  if (!value) return null;
-  return Array.isArray(value) ? value[0] || null : value;
-}
-
 function getActivityUser(event: ParticipantActivity) {
-  const profile = firstRelation(event.profiles);
-  return profile?.email || "Participante sin email";
+  return event.user_email || "Participante sin email";
 }
 
 function getActivityLabel(action: string) {
@@ -812,11 +836,8 @@ function getActivityHint(action: string) {
 }
 
 function getActivityTarget(event: ParticipantActivity) {
-  const stand = firstRelation(event.stands);
-  const pavilion = firstRelation(event.pavilions);
-
-  if (stand?.title) return stand.title;
-  if (pavilion?.name) return pavilion.name;
+  if (event.stand_title) return event.stand_title;
+  if (event.pavilion_name) return event.pavilion_name;
   if (event.action === "fair_entered") return "Entrada principal";
   if (event.action === "auditorium_entered") return "Auditorio";
 
