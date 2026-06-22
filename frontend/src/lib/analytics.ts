@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import { getSessionWithTimeout, withTimeout } from "@/lib/supabaseAuth";
+import { withTimeout } from "@/lib/supabaseAuth";
 
 export type AnalyticsAction =
   | "fair_entered"
@@ -28,6 +28,16 @@ function getAnalyticsEndpoint() {
     : `${apiBaseUrl}/api/analytics/track`;
 }
 
+async function getCurrentSessionForAnalytics() {
+  try {
+    const { data } = await supabase.auth.getSession();
+    return data.session ?? null;
+  } catch (error) {
+    console.warn("[analytics] session unavailable", error);
+    return null;
+  }
+}
+
 export async function trackAnalyticsEvent({
   eventId,
   pavilionId,
@@ -38,7 +48,7 @@ export async function trackAnalyticsEvent({
   if (!eventId) return;
 
   try {
-    const { data: { session } } = await getSessionWithTimeout("Analytics session check");
+    const session = await getCurrentSessionForAnalytics();
     if (!session?.user || !session.access_token) return;
 
     try {
