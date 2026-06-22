@@ -19,6 +19,15 @@ interface TrackAnalyticsInput {
   metadata?: Record<string, unknown>;
 }
 
+function getAnalyticsEndpoint() {
+  const rawApiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+  const apiBaseUrl = rawApiBaseUrl.replace(/\/+$/, "");
+
+  return apiBaseUrl.endsWith("/api")
+    ? `${apiBaseUrl}/analytics/track`
+    : `${apiBaseUrl}/api/analytics/track`;
+}
+
 export async function trackAnalyticsEvent({
   eventId,
   pavilionId,
@@ -33,9 +42,8 @@ export async function trackAnalyticsEvent({
     if (!session?.user || !session.access_token) return;
 
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
       const apiResponse = await withTimeout(
-        fetch(`${apiBaseUrl}/analytics/track`, {
+        fetch(getAnalyticsEndpoint(), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -55,7 +63,8 @@ export async function trackAnalyticsEvent({
 
       if (apiResponse.ok) return;
 
-      console.warn("[analytics] backend event not recorded", apiResponse.status);
+      const errorBody = await apiResponse.text().catch(() => "");
+      console.warn("[analytics] backend event not recorded", apiResponse.status, errorBody);
     } catch (backendError) {
       console.warn("[analytics] backend request failed, trying Supabase fallback", backendError);
     }
