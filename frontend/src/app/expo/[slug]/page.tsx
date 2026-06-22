@@ -598,10 +598,10 @@ export default function FairExpoPage() {
               onStandClick={(stand) => {
                 trackAnalyticsEvent({
                   eventId: currentEventId,
-                  pavilionId: activePavilionId,
+                  pavilionId: stand.pavilion_id ?? activePavilionId,
                   standId: stand.id,
                   action: "stand_viewed",
-                  metadata: { title: stand.title },
+                  metadata: { title: stand.title, source: "stand_card_click" },
                 });
                 setSelectedStand(stand);
               }}
@@ -624,7 +624,7 @@ export default function FairExpoPage() {
 
       <AnimatePresence>
         {view === "stand" && selectedStand && (
-          <StandDetail stand={selectedStand} onClose={() => setSelectedStand(null)} />
+          <StandDetail stand={selectedStand} eventId={currentEventId} onClose={() => setSelectedStand(null)} />
         )}
       </AnimatePresence>
 

@@ -47,10 +47,11 @@ const getEmbedUrl = (url: string | null) => {
 
 interface StandDetailProps {
   stand: Stand;
+  eventId?: string | null;
   onClose: () => void;
 }
 
-export default function StandDetail({ stand, onClose }: StandDetailProps) {
+export default function StandDetail({ stand, eventId, onClose }: StandDetailProps) {
   const [activePhoto, setActivePhoto] = useState<string | null>(null);
   const [syncingDocs, setSyncingDocs] = useState(false);
   const [documentSyncMessage, setDocumentSyncMessage] = useState<string | null>(null);
@@ -70,9 +71,11 @@ export default function StandDetail({ stand, onClose }: StandDetailProps) {
   useEffect(() => {
     if (viewedStandRef.current === stand.id) return;
     viewedStandRef.current = stand.id;
+    const analyticsEventId = stand.event_id ?? eventId;
+    if (!analyticsEventId) return;
 
     trackAnalyticsEvent({
-      eventId: stand.event_id,
+      eventId: analyticsEventId,
       pavilionId: stand.pavilion_id ?? null,
       standId: stand.id,
       action: "stand_viewed",
@@ -81,13 +84,14 @@ export default function StandDetail({ stand, onClose }: StandDetailProps) {
         source: "stand_detail",
       },
     });
-  }, [stand.event_id, stand.id, stand.pavilion_id, stand.title]);
+  }, [eventId, stand.event_id, stand.id, stand.pavilion_id, stand.title]);
 
   const recordStandAction = async (action: string, metadata: Record<string, unknown> = {}) => {
     const { data: { session } } = await supabase.auth.getSession();
+    const analyticsEventId = stand.event_id ?? eventId;
 
     trackAnalyticsEvent({
-      eventId: stand.event_id,
+      eventId: analyticsEventId,
       pavilionId: stand.pavilion_id ?? null,
       standId: stand.id,
       action: action === "document_opened" ? "document_opened" : "stand_cta_clicked",
@@ -98,9 +102,10 @@ export default function StandDetail({ stand, onClose }: StandDetailProps) {
 
     const leadActions = ["whatsapp_clicked", "email_clicked", "phone_clicked", "website_clicked"];
     if (!leadActions.includes(action)) return;
+    if (!analyticsEventId) return;
 
     const { error } = await supabase.from("stand_leads").insert({
-      event_id: stand.event_id,
+      event_id: analyticsEventId,
       stand_id: stand.id,
       user_id: session.user.id,
       action,
