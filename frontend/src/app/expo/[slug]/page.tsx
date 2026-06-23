@@ -10,7 +10,7 @@ import Auditorium from "@/components/fair/Auditorium";
 import FairAssistant, { type FairAssistantRecommendation } from "@/components/fair/FairAssistant";
 import { useFairStore } from "@/store/useFairStore";
 import { Stand } from "@/../../shared";
-import { Map as MapIcon } from "lucide-react";
+import { Building2, Map as MapIcon, Search, X } from "lucide-react";
 import { trackAnalyticsEvent } from "@/lib/analytics";
 import { getSessionWithRetry } from "@/lib/supabaseAuth";
 
@@ -49,7 +49,9 @@ export default function FairExpoPage() {
   const [pavilions, setPavilions] = useState<PavilionNavItem[]>([]);
   const [activePavilionId, setActivePavilionId] = useState<string | null>(null);
   const [stands, setStands] = useState<Stand[]>([]);
+  const [allStands, setAllStands] = useState<Stand[]>([]);
   const [standsLoading, setStandsLoading] = useState(false);
+  const [explorerOpen, setExplorerOpen] = useState(false);
   const standsRequestId = useRef(0);
   const standsCache = useRef<Map<string, Stand[]>>(new Map());
 
@@ -388,6 +390,39 @@ export default function FairExpoPage() {
   }, [activePavilionId, accessStatus, currentEventId]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function fetchAllStands() {
+      if (!currentEventId || accessStatus !== "granted") {
+        setAllStands([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("stands")
+        .select("*")
+        .eq("event_id", currentEventId)
+        .order("title", { ascending: true });
+
+      if (cancelled) return;
+
+      if (error) {
+        console.warn("[expo] stand explorer could not load stands", error.message);
+        setAllStands([]);
+        return;
+      }
+
+      setAllStands((data || []) as Stand[]);
+    }
+
+    fetchAllStands();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentEventId, accessStatus]);
+
+  useEffect(() => {
     if (view === "auditorium" && accessStatus === "granted") {
       trackAnalyticsEvent({
         eventId: currentEventId,
@@ -445,6 +480,27 @@ export default function FairExpoPage() {
       standId: stand.id,
       action: "stand_viewed",
       metadata: { title: stand.title, source: "assistant_recommendation" },
+    });
+  };
+
+  const openExplorerStand = (stand: Stand) => {
+    if (stand.pavilion_id) {
+      const nextCache = standsCache.current.get(stand.pavilion_id) || [];
+      if (!nextCache.some((item) => item.id === stand.id)) {
+        standsCache.current.set(stand.pavilion_id, [...nextCache, stand]);
+      }
+      setActivePavilionId(stand.pavilion_id);
+    }
+
+    setView("pavilion");
+    setSelectedStand(stand);
+    setExplorerOpen(false);
+    trackAnalyticsEvent({
+      eventId: currentEventId,
+      pavilionId: stand.pavilion_id ?? null,
+      standId: stand.id,
+      action: "stand_viewed",
+      metadata: { title: stand.title, source: "stand_explorer" },
     });
   };
 
@@ -581,6 +637,16 @@ export default function FairExpoPage() {
         </button>
       </div>
 
+      {view === "pavilion" && (
+        <button
+          onClick={() => setExplorerOpen(true)}
+          className="fixed bottom-36 right-8 z-40 flex items-center gap-3 rounded-2xl border border-white/20 bg-black/70 px-5 py-4 text-[10px] font-black uppercase tracking-widest text-white shadow-2xl backdrop-blur-2xl transition hover:border-primary/60 hover:bg-primary hover:text-black"
+        >
+          <Search size={16} />
+          Explorar stands
+        </button>
+      )}
+
       <AnimatePresence mode="wait">
         {view === "pavilion" && (
           <motion.div
@@ -628,6 +694,14 @@ export default function FairExpoPage() {
         )}
       </AnimatePresence>
 
+      <StandExplorer
+        open={explorerOpen}
+        stands={allStands}
+        pavilions={pavilions}
+        onClose={() => setExplorerOpen(false)}
+        onOpenStand={openExplorerStand}
+      />
+
       <FairAssistant
         slug={String(slug)}
         eventId={currentEventId}
@@ -646,5 +720,146 @@ export default function FairExpoPage() {
         <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-secondary/5 blur-[150px] rounded-full animate-pulse [animation-delay:2s]" />
       </div>
     </div>
+  );
+}
+
+function StandExplorer({
+  open,
+  stands,
+  pavilions,
+  onClose,
+  onOpenStand,
+}: {
+  open: boolean;
+  stands: Stand[];
+  pavilions: PavilionNavItem[];
+  onClose: () => void;
+  onOpenStand: (stand: Stand) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [selectedPavilionId, setSelectedPavilionId] = useState<string>("all");
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const pavilionById = new Map(pavilions.map((pavilion) => [pavilion.id, pavilion.name]));
+  const filteredStands = stands.filter((stand) => {
+    const matchesPavilion = selectedPavilionId === "all" || stand.pavilion_id === selectedPavilionId;
+    const searchable = [
+      stand.title,
+      stand.description,
+      stand.email,
+      stand.website_url,
+      pavilionById.get(stand.pavilion_id || ""),
+    ].filter(Boolean).join(" ").toLowerCase();
+
+    return matchesPavilion && (!normalizedQuery || searchable.includes(normalizedQuery));
+  });
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-[70] flex justify-end">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          />
+          <motion.aside
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", damping: 28, stiffness: 220 }}
+            className="relative h-full w-full max-w-xl overflow-hidden border-l border-white/10 bg-[#080808]/95 text-white shadow-2xl backdrop-blur-3xl"
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-white/10 p-6">
+              <div>
+                <p className="mb-2 text-[10px] font-black uppercase tracking-[0.3em] text-primary">Directorio</p>
+                <h2 className="text-2xl font-black uppercase tracking-tight">Explorar stands</h2>
+                <p className="mt-2 text-sm text-white/45">Busca empresas, sectores, servicios o pabellones.</p>
+              </div>
+              <button
+                onClick={onClose}
+                className="rounded-xl border border-white/10 p-3 text-white/45 transition hover:border-white/30 hover:text-white"
+                aria-label="Cerrar explorador"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4 border-b border-white/10 p-6">
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" size={17} />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Buscar stand, empresa o servicio..."
+                  className="w-full rounded-2xl border border-white/10 bg-white/[0.04] py-4 pl-12 pr-4 text-sm font-bold text-white outline-none transition focus:border-primary/60"
+                />
+              </div>
+
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                <button
+                  onClick={() => setSelectedPavilionId("all")}
+                  className={`shrink-0 rounded-full border px-4 py-2 text-[9px] font-black uppercase tracking-widest transition ${selectedPavilionId === "all" ? "border-primary bg-primary text-black" : "border-white/10 bg-white/[0.03] text-white/50 hover:text-white"}`}
+                >
+                  Todos
+                </button>
+                {pavilions.map((pavilion) => (
+                  <button
+                    key={pavilion.id}
+                    onClick={() => setSelectedPavilionId(pavilion.id)}
+                    className={`shrink-0 rounded-full border px-4 py-2 text-[9px] font-black uppercase tracking-widest transition ${selectedPavilionId === pavilion.id ? "border-primary bg-primary text-black" : "border-white/10 bg-white/[0.03] text-white/50 hover:text-white"}`}
+                  >
+                    {pavilion.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="h-[calc(100%-220px)] overflow-y-auto p-6">
+              {filteredStands.length === 0 ? (
+                <div className="flex h-full flex-col items-center justify-center rounded-3xl border border-dashed border-white/10 p-10 text-center">
+                  <Building2 className="mb-4 text-white/25" size={34} />
+                  <h3 className="text-sm font-black uppercase tracking-widest">Sin resultados</h3>
+                  <p className="mt-3 text-sm leading-6 text-white/40">Prueba con otro termino o cambia de pabellon.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredStands.map((stand) => (
+                    <button
+                      key={stand.id}
+                      onClick={() => onOpenStand(stand)}
+                      className="group w-full rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-left transition hover:border-primary/50 hover:bg-white/[0.07]"
+                    >
+                      <div className="flex gap-4">
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white">
+                          {stand.logo_url || stand.images?.[0] ? (
+                            <img src={stand.logo_url || stand.images?.[0]} alt={stand.title} className="h-full w-full object-contain p-2" />
+                          ) : (
+                            <span className="text-sm font-black text-slate-700">{stand.title?.slice(0, 2).toUpperCase() || "ST"}</span>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="line-clamp-2 text-sm font-black uppercase tracking-widest text-white group-hover:text-primary">
+                            {stand.title || "Stand sin titulo"}
+                          </h3>
+                          <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-white/30">
+                            {pavilionById.get(stand.pavilion_id || "") || "Pabellon"}
+                          </p>
+                          {stand.description && (
+                            <p className="mt-2 line-clamp-2 text-xs leading-5 text-white/45">{stand.description}</p>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.aside>
+        </div>
+      )}
+    </AnimatePresence>
   );
 }
