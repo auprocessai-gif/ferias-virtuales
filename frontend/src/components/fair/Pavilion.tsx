@@ -95,9 +95,15 @@ export default function Pavilion({ stands, pavilionName, isLoading = false, onSt
             >
               {stands.map((stand, index) => {
                 // Lógica de "dispersión" mejorada para que no se pisen los stands nuevos (en posición 50,50)
-                const samePosCount = stands.slice(0, index).filter(s => 
-                  (s.position_x || 50) === (stand.position_x || 50) && 
-                  (s.position_y || 50) === (stand.position_y || 50)
+                const basePosition = {
+                  x: stand.position_x ?? 50,
+                  y: stand.position_y ?? 50,
+                };
+                const samePosCount = stands.slice(0, index).filter((s) => 
+                  standDistance(basePosition, {
+                    x: s.position_x ?? 50,
+                    y: s.position_y ?? 50,
+                  }) < 13
                 ).length;
                 
                 // Si hay colisión, aplicamos un patrón circular/espiral para dispersarlos
@@ -119,8 +125,8 @@ export default function Pavilion({ stands, pavilionName, isLoading = false, onSt
                 const themedStand = {
                   ...stand,
                   theme_color: accentTheme.hex,
-                  position_x: (stand.position_x || 50) + offsetX,
-                  position_y: (stand.position_y || 50) + offsetY
+                  position_x: clamp(basePosition.x + offsetX, 8, 92),
+                  position_y: clamp(basePosition.y + offsetY, 14, 86)
                 };
 
                 return (
@@ -183,4 +189,10 @@ export default function Pavilion({ stands, pavilionName, isLoading = false, onSt
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function standDistance(a: { x: number; y: number }, b: { x: number; y: number }) {
+  const dx = a.x - b.x;
+  const dy = (a.y - b.y) * 1.7;
+  return Math.sqrt((dx * dx) + (dy * dy));
 }

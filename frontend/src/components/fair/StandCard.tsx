@@ -14,6 +14,7 @@ interface StandCardProps {
 
 export default function StandCard({ stand, onClick, color = "orange", theme }: StandCardProps) {
   const activeColor = theme || standThemes.find((item) => item.key === color) || getStandTheme(stand);
+  const logoSrc = stand.logo_url || stand.images?.[0] || "/placeholder-logo.png";
 
   return (
     <motion.div
@@ -32,7 +33,7 @@ export default function StandCard({ stand, onClick, color = "orange", theme }: S
       onClick={() => onClick(stand)}
     >
       {/* Stand Structure (Fake 3D Box) */}
-      <div className="relative w-32 h-40 transform-gpu preserve-3d">
+      <div className="relative w-36 h-44 transform-gpu preserve-3d">
         {/* Floor shadow */}
         <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-24 h-12 bg-black/40 blur-xl rounded-full transform -rotate-x-12" />
 
@@ -43,11 +44,20 @@ export default function StandCard({ stand, onClick, color = "orange", theme }: S
         >
           {/* Logo Area */}
           <div className={`w-14 h-14 rounded-xl bg-white flex items-center justify-center p-2 border ${activeColor.border || "border-white/20"} shadow-inner`}>
-            <img src={stand.images[0] || "/placeholder-logo.png"} alt={stand.title} className="w-full h-full object-contain" />
+            <img src={logoSrc} alt={stand.title} className="w-full h-full object-contain" />
           </div>
           
-          <div className="text-center space-y-1">
-            <h3 className="text-[9px] uppercase font-black tracking-widest text-slate-800 truncate w-full leading-tight">
+          <div className="w-full text-center space-y-1">
+            <h3
+              className="mx-auto max-w-[7.2rem] text-center text-[8.5px] uppercase font-black tracking-widest text-slate-800 leading-[1.15]"
+              style={{
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+                overflowWrap: "anywhere",
+              }}
+            >
               {stand.title}
             </h3>
             <div className={`flex gap-1.5 justify-center ${activeColor.text || ""} opacity-60 group-hover:opacity-100 transition-opacity`} style={{ color: activeColor.hex }}>

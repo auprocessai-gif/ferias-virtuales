@@ -37,6 +37,8 @@ interface Stand {
   user_id: string | null;
   email: string | null;
   theme_color: string | null;
+  position_x?: number | null;
+  position_y?: number | null;
   images: string[];
 }
 
@@ -200,12 +202,15 @@ export default function StandsPage({ params }: { params: Promise<{ fairId: strin
 
   const handleCreateStand = async () => {
     try {
+      const nextPosition = findOpenStandPosition(stands);
       const { data, error } = await supabase.from('stands').insert({
         pavilion_id: pavilionId,
         event_id: fairId,
         title: 'Empresa Nueva',
         description: 'Descripción básica de la empresa...',
         theme_color: standThemes[stands.length % standThemes.length].hex,
+        position_x: nextPosition.x,
+        position_y: nextPosition.y,
       }).select().single();
 
       if (error) throw error;
@@ -658,6 +663,37 @@ function getStandCardColor(stand: Stand, index: number) {
   }
 
   return standThemes[index % standThemes.length].hex;
+}
+
+function findOpenStandPosition(stands: Stand[]) {
+  const candidates = [
+    { x: 22, y: 28 }, { x: 38, y: 24 }, { x: 55, y: 27 }, { x: 72, y: 30 },
+    { x: 28, y: 43 }, { x: 47, y: 42 }, { x: 66, y: 46 },
+    { x: 20, y: 60 }, { x: 40, y: 61 }, { x: 60, y: 63 }, { x: 78, y: 58 },
+    { x: 27, y: 76 }, { x: 49, y: 78 }, { x: 70, y: 75 },
+  ];
+
+  const occupied = stands
+    .filter((stand) => typeof stand.position_x === "number" && typeof stand.position_y === "number")
+    .map((stand) => ({ x: Number(stand.position_x), y: Number(stand.position_y) }));
+
+  const freeCandidate = candidates.find((candidate) => (
+    occupied.every((position) => standDistance(candidate, position) >= 13)
+  ));
+
+  if (freeCandidate) return freeCandidate;
+
+  const index = stands.length;
+  return {
+    x: 18 + ((index * 17) % 64),
+    y: 25 + ((index * 11) % 52),
+  };
+}
+
+function standDistance(a: { x: number; y: number }, b: { x: number; y: number }) {
+  const dx = a.x - b.x;
+  const dy = (a.y - b.y) * 1.7;
+  return Math.sqrt((dx * dx) + (dy * dy));
 }
 
 function Section({ label, children }: any) {
