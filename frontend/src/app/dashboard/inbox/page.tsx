@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BellRing, ExternalLink, Store } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { getDashboardAccess } from "@/lib/dashboardAccess";
 
 interface EventLink {
   id: string;
@@ -21,13 +22,9 @@ export default function DashboardInboxIndexPage() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user) return;
 
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", session.user.id)
-          .single();
+        const access = await getDashboardAccess();
 
-        if (profile?.role === "admin") {
+        if (access?.isAdmin) {
           const { data } = await supabase
             .from("events")
             .select("id,title,slug")
@@ -36,13 +33,8 @@ export default function DashboardInboxIndexPage() {
           return;
         }
 
-        if (profile?.role === "manager") {
-          const { data: assignments } = await supabase
-            .from("event_managers")
-            .select("event_id")
-            .eq("user_id", session.user.id);
-
-          const eventIds = (assignments || []).map((assignment) => assignment.event_id);
+        if (access?.managedFairIds.length) {
+          const eventIds = access.managedFairIds;
           if (eventIds.length === 0) return;
 
           const { data } = await supabase

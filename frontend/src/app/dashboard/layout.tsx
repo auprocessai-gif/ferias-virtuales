@@ -84,6 +84,24 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     window.location.href = "/login";
   };
 
+  const navLinkClass = (href: string) => {
+    const isActive = href === "/dashboard"
+      ? pathname === "/dashboard"
+      : pathname?.startsWith(href);
+
+    return isActive
+      ? "flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 text-primary transition-colors border border-primary/20 shadow-[0_0_15px_rgba(0,242,255,0.1)]"
+      : "flex items-center gap-3 px-4 py-3 rounded-xl text-white/50 hover:bg-white/5 hover:text-white transition-colors group";
+  };
+
+  const navIconClass = (href: string) => {
+    const isActive = href === "/dashboard"
+      ? pathname === "/dashboard"
+      : pathname?.startsWith(href);
+
+    return isActive ? "text-primary" : "group-hover:text-primary transition-colors";
+  };
+
   if (loading) return (
     <div className="min-h-screen bg-[#050505] flex items-center justify-center">
       <div className="w-12 h-12 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -129,29 +147,29 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
         <nav className="flex-1 px-4 py-8 flex flex-col gap-2">
           {/* Common Links */}
-          <Link href="/dashboard" className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 text-primary transition-colors border border-primary/20 shadow-[0_0_15px_rgba(0,242,255,0.1)]">
-            <LayoutDashboard size={18} />
+          <Link href="/dashboard" className={navLinkClass("/dashboard")}>
+            <LayoutDashboard size={18} className={navIconClass("/dashboard")} />
             <span className="text-xs uppercase font-bold tracking-widest">Resumen</span>
           </Link>
 
-          <Link href="/dashboard/inbox" className="flex items-center gap-3 px-4 py-3 rounded-xl text-white/50 hover:bg-white/5 hover:text-white transition-colors group">
-            <Inbox size={18} className="group-hover:text-primary transition-colors"/>
+          <Link href="/dashboard/inbox" className={navLinkClass("/dashboard/inbox")}>
+            <Inbox size={18} className={navIconClass("/dashboard/inbox")}/>
             <span className="text-xs uppercase font-bold tracking-widest">Bandeja</span>
           </Link>
 
           {/* Manager / Admin Specific Links */}
           {access?.canOpenDashboard && (
             <>
-              <Link href="/dashboard/fairs" className="flex items-center gap-3 px-4 py-3 rounded-xl text-white/50 hover:bg-white/5 hover:text-white transition-colors group">
-                <Briefcase size={18} className="group-hover:text-primary transition-colors"/>
+              <Link href="/dashboard/fairs" className={navLinkClass("/dashboard/fairs")}>
+                <Briefcase size={18} className={navIconClass("/dashboard/fairs")}/>
                 <span className="text-xs uppercase font-bold tracking-widest">Mis Ferias</span>
               </Link>
             </>
           )}
 
           <div className="mt-auto pt-4 border-t border-white/5">
-             <Link href="/dashboard/settings" className="flex items-center gap-3 px-4 py-3 rounded-xl text-white/50 hover:bg-white/5 hover:text-white transition-colors group">
-                <Settings size={18} className="group-hover:text-primary transition-colors"/>
+             <Link href="/dashboard/settings" className={navLinkClass("/dashboard/settings")}>
+                <Settings size={18} className={navIconClass("/dashboard/settings")}/>
                 <span className="text-xs uppercase font-bold tracking-widest">Ajustes</span>
               </Link>
           </div>
