@@ -44,7 +44,7 @@ export default function Pavilion({ stands, pavilionName, isLoading = false, onSt
       className="relative w-full h-[90vh] overflow-hidden bg-[#080b12]"
     >
       {/* Dynamic Background Atmosphere */}
-      <div className="absolute inset-0 bg-[url('/images/pavilion_bg.png')] bg-cover bg-center opacity-40 mix-blend-screen pointer-events-none" />
+      <div className="absolute inset-0 bg-[url('/images/pavilion_bg_minimal_future.png')] bg-cover bg-center opacity-40 mix-blend-screen pointer-events-none" />
       <div className="absolute inset-0 bg-gradient-to-b from-[#080b12]/0 via-[#080b12]/40 to-[#080b12] pointer-events-none" />
       
       {/* 3D Scene Viewport */}
@@ -73,7 +73,7 @@ export default function Pavilion({ stands, pavilionName, isLoading = false, onSt
           >
             {/* The Actual Generated Background */}
             <div 
-              className="absolute inset-0 bg-[url('/images/pavilion_bg.png')] bg-cover bg-center brightness-125 contrast-110"
+              className="absolute inset-0 bg-[url('/images/pavilion_bg_minimal_future.png')] bg-cover bg-center brightness-125 contrast-110"
               style={{ transform: "scale(1.1)" }}
             />
             
