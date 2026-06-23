@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { BarChart3, Bell, Eye, MousePointerClick, Store, Users } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { getDashboardAccess } from "@/lib/dashboardAccess";
 
 interface DashboardMetrics {
   fairEntries: number;
@@ -49,19 +50,33 @@ export default function Dashboard() {
   useEffect(() => {
     async function loadRealMetrics() {
       try {
+        const access = await getDashboardAccess();
+        const isAdmin = Boolean(access?.isAdmin);
+        const managedFairIds = access?.managedFairIds || [];
+
+        if (!isAdmin && managedFairIds.length === 0) {
+          setMetrics({ fairEntries: 0, standViews: 0, leads: 0, participants: 0 });
+          setRecentActivity([]);
+          return;
+        }
+
+        const summaryQuery = supabase
+          .from("fair_analytics_summary")
+          .select("event_id,fair_entries,stand_views,leads,registered_participants");
+
+        const activityQuery = supabase
+          .from("analytics_events")
+          .select("id,event_id,action,metadata,created_at")
+          .order("created_at", { ascending: false })
+          .limit(5);
+
         const [{ data: summaries }, { data: activity }] = await Promise.all([
           withTimeout(
-            supabase
-              .from("fair_analytics_summary")
-              .select("fair_entries,stand_views,leads,registered_participants"),
+            isAdmin ? summaryQuery : summaryQuery.in("event_id", managedFairIds),
             "Dashboard summary metrics"
           ),
           withTimeout(
-            supabase
-              .from("analytics_events")
-              .select("id,action,metadata,created_at")
-              .order("created_at", { ascending: false })
-              .limit(5),
+            isAdmin ? activityQuery : activityQuery.in("event_id", managedFairIds),
             "Dashboard recent activity"
           ),
         ]);

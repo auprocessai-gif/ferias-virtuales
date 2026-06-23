@@ -9,6 +9,7 @@ import { usePresence } from "@/context/PresenceProvider";
 import { useFairStore, type UserRole } from "@/store/useFairStore";
 import { usePathname } from "next/navigation";
 import { getSessionWithTimeout, withTimeout } from "@/lib/supabaseAuth";
+import { getDashboardAccess } from "@/lib/dashboardAccess";
 
 const normalizeUserRole = (role?: string | null): UserRole => (
   role === 'admin' || role === 'manager' ? role : 'participant'
@@ -45,17 +46,12 @@ export default function Navbar() {
       }
 
       try {
-        const { data: profile } = await withTimeout(
-          supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', currentUser.id)
-            .maybeSingle(),
-          "No se pudo comprobar el rol del usuario."
-        );
+        const dashboardAccess = await getDashboardAccess();
 
         if (!mounted) return;
-        const role = normalizeUserRole(profile?.role);
+        const role = dashboardAccess?.canOpenDashboard && dashboardAccess.role !== "admin"
+          ? "manager"
+          : normalizeUserRole(dashboardAccess?.role);
         setUserRole(role);
 
         if (role !== 'participant') {

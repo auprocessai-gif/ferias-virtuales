@@ -5,32 +5,19 @@ import Link from "next/link";
 import { LayoutDashboard, LogOut, Settings, Briefcase, Inbox } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { usePathname } from "next/navigation";
-import { getSessionWithTimeout } from "@/lib/supabaseAuth";
-
-const dashboardRoles = new Set(["admin", "manager"]);
-const DASHBOARD_AUTH_TIMEOUT_MS = 20000;
-type ProfileRoleResponse = { data: { role: string } | null; error: { message: string } | null };
-
-function withTimeout<T>(promise: PromiseLike<T>, label: string, timeoutMs = DASHBOARD_AUTH_TIMEOUT_MS): Promise<T> {
-  return Promise.race([
-    Promise.resolve(promise),
-    new Promise<T>((_, reject) => {
-      window.setTimeout(() => reject(new Error(`${label} timed out`)), timeoutMs);
-    }),
-  ]);
-}
+import { getDashboardAccess, type DashboardAccess } from "@/lib/dashboardAccess";
 
 const wait = (milliseconds: number) => new Promise<void>((resolve) => {
   window.setTimeout(resolve, milliseconds);
 });
 
-async function resolveSession() {
+async function resolveDashboardAccess() {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      const { data: { session } } = await getSessionWithTimeout("Dashboard session check");
-      if (session?.user) return session;
+      const access = await getDashboardAccess();
+      if (access) return access;
     } catch (error) {
-      console.warn(`[dashboard] session attempt ${attempt + 1} failed`, error);
+      console.warn(`[dashboard] access attempt ${attempt + 1} failed`, error);
     }
 
     await wait(500);
@@ -39,25 +26,10 @@ async function resolveSession() {
   return null;
 }
 
-async function retry<T>(factory: () => PromiseLike<T>, label: string, attempts = 3): Promise<T> {
-  let lastError: unknown = null;
-
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    try {
-      return await withTimeout(factory(), label);
-    } catch (error) {
-      lastError = error;
-      console.warn(`[dashboard] ${label} attempt ${attempt + 1} failed`, error);
-      await wait(700);
-    }
-  }
-
-  throw lastError instanceof Error ? lastError : new Error(`${label} failed`);
-}
-
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [role, setRole] = useState<string | null>(null);
+  const [access, setAccess] = useState<DashboardAccess | null>(null);
   const [loading, setLoading] = useState(true);
   const [accessError, setAccessError] = useState<string | null>(null);
 
@@ -69,38 +41,26 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         setLoading(true);
         setAccessError(null);
 
-        const session = await resolveSession();
+        const dashboardAccess = await resolveDashboardAccess();
 
-        if (!session?.user) {
+        if (!dashboardAccess) {
           if (mounted) {
             setAccessError("No hay una sesion activa para abrir el panel. Inicia sesion de nuevo como administrador o gestor.");
           }
           return;
         }
 
-        const { data: profile, error: profileError } = await retry<ProfileRoleResponse>(
-          () => supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', session.user.id)
-            .maybeSingle() as unknown as PromiseLike<ProfileRoleResponse>,
-          "Dashboard profile check"
-        );
-
-        if (profileError) throw profileError;
-
-        const profileRole = profile?.role || "participant";
-
-        if (!dashboardRoles.has(profileRole)) {
+        if (!dashboardAccess.canOpenDashboard) {
           if (mounted) {
-            setRole(profileRole);
+            setRole(dashboardAccess.role);
             setAccessError("Tu usuario esta registrado como participante. Ese rol puede entrar a la feria, pero no al panel de gestion.");
           }
           return;
         }
 
         if (mounted) {
-          setRole(profileRole);
+          setRole(dashboardAccess.role);
+          setAccess(dashboardAccess);
         }
       } catch (err) {
         console.error("DashboardLayout Auth Error:", err);
@@ -180,7 +140,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </Link>
 
           {/* Manager / Admin Specific Links */}
-          {(role === 'admin' || role === 'manager') && (
+          {access?.canOpenDashboard && (
             <>
               <Link href="/dashboard/fairs" className="flex items-center gap-3 px-4 py-3 rounded-xl text-white/50 hover:bg-white/5 hover:text-white transition-colors group">
                 <Briefcase size={18} className="group-hover:text-primary transition-colors"/>

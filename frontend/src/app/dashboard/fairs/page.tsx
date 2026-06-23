@@ -12,9 +12,11 @@ import {
   BarChart3,
   Lock,
   Users,
-  Inbox
+  Inbox,
+  UserCog
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { getDashboardAccess } from "@/lib/dashboardAccess";
 import Link from "next/link";
 
 interface Fair {
@@ -30,10 +32,6 @@ interface Fair {
   registration_mode?: 'open' | 'approval_required' | 'invite_only' | null;
 }
 
-interface EventAssignment {
-  event_id: string;
-}
-
 export default function FairsPage() {
   const [fairs, setFairs] = useState<Fair[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,30 +43,24 @@ export default function FairsPage() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user) { setLoading(false); return; }
 
-        // Obtenemos el perfil para saber el rol
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .single();
-        
-        const userRole = profile?.role || 'participant';
+        const access = await getDashboardAccess();
+        if (!access?.canOpenDashboard) {
+          setLoading(false);
+          return;
+        }
+
+        const userRole = access.role;
         setRole(userRole);
 
         // Obtenemos las ferias según el rol
-        if (userRole === 'admin') {
+        if (access.isAdmin) {
           const { data } = await supabase
             .from('events')
             .select('*')
             .order('created_at', { ascending: false });
           setFairs(data || []);
-        } else if (userRole === 'manager') {
-          const { data: assignments } = await supabase
-            .from('event_managers')
-            .select('event_id')
-            .eq('user_id', session.user.id);
-          
-          const eventIds = (assignments as EventAssignment[] | null)?.map((assignment) => assignment.event_id) || [];
+        } else {
+          const eventIds = access.managedFairIds;
           if (eventIds.length > 0) {
             const { data } = await supabase
               .from('events')
@@ -220,6 +212,15 @@ export default function FairsPage() {
                     <Settings size={14} className="text-primary" />
                     Ajustes
                   </Link>
+                  {role === 'admin' && (
+                    <Link
+                      href={`/dashboard/fairs/${fair.id}/managers`}
+                      className="col-span-2 flex items-center justify-center gap-2 px-3 py-3 bg-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all border border-white/5"
+                    >
+                      <UserCog size={14} className="text-primary" />
+                      Gestores
+                    </Link>
+                  )}
                 </div>
               </div>
 

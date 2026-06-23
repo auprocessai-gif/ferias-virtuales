@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS public.analytics_events (
   pavilion_id UUID REFERENCES public.pavilions(id) ON DELETE SET NULL,
   stand_id UUID REFERENCES public.stands(id) ON DELETE SET NULL,
   user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  event_type TEXT NOT NULL DEFAULT 'fair_entered',
   action TEXT NOT NULL,
   metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
@@ -89,9 +90,45 @@ ALTER TABLE public.analytics_events
   ADD COLUMN IF NOT EXISTS pavilion_id UUID REFERENCES public.pavilions(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS stand_id UUID REFERENCES public.stands(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS event_type TEXT,
   ADD COLUMN IF NOT EXISTS action TEXT,
   ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
   ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now());
+
+ALTER TABLE public.analytics_events
+  DROP CONSTRAINT IF EXISTS analytics_event_type_check;
+
+UPDATE public.analytics_events
+SET event_type = COALESCE(NULLIF(action, ''), 'fair_entered')
+WHERE event_type IS NULL
+  OR event_type NOT IN (
+    'fair_entered',
+    'pavilion_entered',
+    'stand_viewed',
+    'auditorium_entered',
+    'stand_cta_clicked',
+    'document_opened',
+    'video_played',
+    'chat_message_sent'
+  );
+
+ALTER TABLE public.analytics_events
+  ALTER COLUMN event_type SET DEFAULT 'fair_entered';
+
+ALTER TABLE public.analytics_events
+  ADD CONSTRAINT analytics_event_type_check
+  CHECK (
+    event_type IN (
+      'fair_entered',
+      'pavilion_entered',
+      'stand_viewed',
+      'auditorium_entered',
+      'stand_cta_clicked',
+      'document_opened',
+      'video_played',
+      'chat_message_sent'
+    )
+  );
 
 CREATE INDEX IF NOT EXISTS idx_analytics_events_event_action_created
   ON public.analytics_events(event_id, action, created_at DESC);
@@ -175,6 +212,17 @@ ALTER TABLE public.event_participants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.event_invitations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.analytics_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stand_leads ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Participants can read own event access" ON public.event_participants;
+DROP POLICY IF EXISTS "Participants can self register" ON public.event_participants;
+DROP POLICY IF EXISTS "Admins and managers can manage participants" ON public.event_participants;
+DROP POLICY IF EXISTS "Users can read invitations addressed to them" ON public.event_invitations;
+DROP POLICY IF EXISTS "Admins and managers can manage invitations" ON public.event_invitations;
+DROP POLICY IF EXISTS "Users can accept own pending invitations" ON public.event_invitations;
+DROP POLICY IF EXISTS "Authenticated users can write analytics" ON public.analytics_events;
+DROP POLICY IF EXISTS "Admins and managers can read analytics" ON public.analytics_events;
+DROP POLICY IF EXISTS "Authenticated users can create stand leads" ON public.stand_leads;
+DROP POLICY IF EXISTS "Admins and managers can read leads" ON public.stand_leads;
 
 CREATE POLICY "Participants can read own event access"
   ON public.event_participants FOR SELECT
