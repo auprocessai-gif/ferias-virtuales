@@ -106,7 +106,7 @@ export default function Dashboard() {
           <h1 className="mb-2 text-4xl font-black uppercase tracking-tight">
             Bienvenido, {userEmail ? userEmail.split("@")[0] : "..."}
           </h1>
-          <p className="font-medium text-white/40">Panel de control de la Feria Virtual</p>
+          <p className="font-medium text-white/40">Panel de control de ievents+</p>
         </div>
         <div className="flex items-center gap-6">
           <button className="glass relative rounded-2xl border border-white/5 p-4" title="Notificaciones">

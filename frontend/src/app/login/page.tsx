@@ -146,7 +146,7 @@ function LoginForm() {
               {isLogin ? "Acceso" : "Registro"}
             </h1>
             <p className="text-xs tracking-[0.2em] uppercase text-primary/80 mt-2 font-bold">
-              {redirectTo.startsWith("/expo/") ? "Accede para entrar a la feria" : "Virtual Fair Platform"}
+              {redirectTo.startsWith("/expo/") ? "Accede para entrar a la feria" : "ievents+"}
             </p>
           </div>
 

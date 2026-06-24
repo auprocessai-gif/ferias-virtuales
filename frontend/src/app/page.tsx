@@ -268,12 +268,20 @@ export default function Home() {
             Congresos, exposiciones y networking
           </div>
 
-          <h1 className="max-w-3xl text-5xl font-black uppercase leading-[0.92] tracking-normal text-white sm:text-7xl lg:text-8xl">
-            Feria Virtual
-          </h1>
+          <div className="mb-5 flex items-center gap-5">
+            <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-white shadow-[0_20px_70px_rgba(255,81,0,0.25)]">
+              <Image src="/brand/ievents-mark.png" alt="ievents+" width={68} height={68} className="h-16 w-16 object-contain" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.35em] text-primary">Immersive events</p>
+              <h1 className="text-5xl font-black uppercase leading-[0.92] tracking-normal text-white sm:text-7xl lg:text-8xl">
+                ievents+
+              </h1>
+            </div>
+          </div>
 
           <p className="mt-6 max-w-2xl text-base font-medium leading-7 text-white/72 sm:text-lg">
-            Un recinto digital para pabellones, stands, auditorios y participantes acreditados. Gestiona el evento y deja que cada asistente entre por su enlace.
+            Ferias virtuales inmersivas para pabellones, stands, auditorios y participantes acreditados. Gestiona el evento y deja que cada asistente entre por su enlace.
           </p>
 
           <div className="mt-8 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3">

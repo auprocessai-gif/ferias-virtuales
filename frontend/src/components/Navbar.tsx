@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { User } from "@supabase/supabase-js";
 import { AlertCircle, LogOut, ShieldCheck, User as UserIcon, X } from "lucide-react";
@@ -173,11 +174,11 @@ export default function Navbar() {
     <>
     <header className="fixed top-2 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl h-16 rounded-2xl border border-white/20 bg-orange-600 backdrop-blur-3xl flex items-center px-8 justify-between shadow-[0_20px_50px_rgba(255,81,0,0.3)]">
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shadow-lg">
-          <div className="w-4 h-4 bg-orange-600 rounded-sm" />
+        <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-lg overflow-hidden">
+          <Image src="/brand/ievents-mark.png" alt="ievents+" width={34} height={34} className="h-8 w-8 object-contain" />
         </div>
         <Link href="/" onClick={handlePabellonRedirect} className="text-lg font-black tracking-tighter uppercase text-white hover:opacity-80 transition-opacity flex items-center gap-2">
-          FERIA <span className="text-white opacity-80">VIRTUAL</span>
+          ievents<span className="text-white opacity-80">+</span>
           {isRefreshing && <div className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />}
         </Link>
       </div>

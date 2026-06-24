@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Link from "next/link";
 import Navbar from "@/components/Navbar";
 
 const geistSans = Geist({
@@ -15,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ferias Virtuales | Plataforma de Congresos y Exposiciones",
-  description: "Explora pabellones y stands en un entorno virtual futurista y minimalista.",
+  title: "ievents+ | Ferias virtuales inmersivas",
+  description: "Crea ferias virtuales con pabellones, stands, auditorios, accesos privados, leads y analitica.",
 };
 
 import { PresenceProvider } from "@/context/PresenceProvider";
