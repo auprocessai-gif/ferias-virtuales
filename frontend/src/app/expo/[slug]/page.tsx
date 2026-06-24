@@ -46,6 +46,7 @@ export default function FairExpoPage() {
   const [accessStatus, setAccessStatus] = useState<AccessStatus>("checking");
 
   const [currentEventId, setCurrentEventId] = useState<string | null>(null);
+  const [currentEventTitle, setCurrentEventTitle] = useState<string>("ievents+");
   const [pavilions, setPavilions] = useState<PavilionNavItem[]>([]);
   const [activePavilionId, setActivePavilionId] = useState<string | null>(null);
   const [stands, setStands] = useState<Stand[]>([]);
@@ -107,6 +108,7 @@ export default function FairExpoPage() {
 
         setCurrentEvent(event);
         setCurrentEventId(event.id);
+        setCurrentEventTitle(event.title || event.name || "ievents+");
 
         const visibility = event.visibility || "public";
         const registrationMode = event.registration_mode || "open";
@@ -636,6 +638,15 @@ export default function FairExpoPage() {
           Auditorio Principal
         </button>
       </div>
+
+      {view === "pavilion" && (
+        <div className="fixed left-1/2 top-24 z-40 hidden -translate-x-1/2 rounded-2xl border border-white/15 bg-black/55 px-6 py-3 text-center text-white shadow-2xl backdrop-blur-2xl lg:block">
+          <p className="text-[8px] font-black uppercase tracking-[0.32em] text-primary">Feria</p>
+          <h2 className="mt-1 max-w-[520px] truncate text-sm font-black uppercase tracking-[0.18em]">
+            {currentEventTitle}
+          </h2>
+        </div>
+      )}
 
       {view === "pavilion" && (
         <button
