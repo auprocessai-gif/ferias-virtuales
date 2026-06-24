@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Check, Copy, ExternalLink, Mail, RefreshCcw, Send, UserX, Users } from "lucide-react";
+import { ArrowLeft, Check, Copy, ExternalLink, Mail, RefreshCcw, Send, UserPlus, UserX, Users } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 interface Participant {
@@ -38,7 +38,9 @@ export default function FairParticipantsPage() {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [fair, setFair] = useState<FairAccessConfig | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [participantEmail, setParticipantEmail] = useState("");
   const [creatingInvite, setCreatingInvite] = useState(false);
+  const [addingParticipant, setAddingParticipant] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
   const [filter, setFilter] = useState<Participant["status"] | "all">("all");
@@ -154,6 +156,61 @@ export default function FairParticipantsPage() {
     setInviteEmail("");
     setInvitations((current) => [data as Invitation, ...current]);
     showNotice("Invitacion creada. Ya puedes copiar el enlace.");
+  };
+
+  const addParticipantByEmail = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const email = participantEmail.trim().toLowerCase();
+    if (!email) return;
+
+    setAddingParticipant(true);
+
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("id,email")
+        .ilike("email", email)
+        .maybeSingle();
+
+      if (profileError) throw profileError;
+
+      if (!profile?.id) {
+        showNotice("Ese email aun no tiene cuenta. Puede registrarse o puedes crear una invitacion.");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("event_participants")
+        .upsert(
+          {
+            event_id: fairId,
+            user_id: profile.id,
+            status: "approved",
+            source: "admin",
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "event_id,user_id" }
+        )
+        .select("id,status,created_at,profiles(email)")
+        .single();
+
+      if (error) throw error;
+
+      setParticipantEmail("");
+      setParticipants((current) => {
+        const nextParticipant = data as Participant;
+        const exists = current.some((participant) => participant.id === nextParticipant.id);
+        return exists
+          ? current.map((participant) => participant.id === nextParticipant.id ? nextParticipant : participant)
+          : [nextParticipant, ...current];
+      });
+      showNotice("Participante asociado a esta feria.");
+    } catch (error) {
+      console.error("[participants] add participant by email failed", error);
+      showNotice(error instanceof Error ? error.message : "No se pudo asociar el participante.");
+    } finally {
+      setAddingParticipant(false);
+    }
   };
 
   const copyFairLink = async (token?: string) => {
@@ -335,6 +392,35 @@ export default function FairParticipantsPage() {
             ))}
           </div>
         )}
+      </section>
+
+      <section className="glass rounded-[2rem] border border-white/5 overflow-hidden">
+        <div className="p-6 border-b border-white/5 flex items-center gap-3">
+          <UserPlus size={18} className="text-primary" />
+          <h2 className="text-sm font-black uppercase tracking-widest">Añadir participante existente</h2>
+        </div>
+
+        <form onSubmit={addParticipantByEmail} className="p-6 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+          <input
+            type="email"
+            value={participantEmail}
+            onChange={(event) => setParticipantEmail(event.target.value)}
+            placeholder="participante@empresa.com"
+            className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:border-primary/60"
+          />
+          <button
+            type="submit"
+            disabled={addingParticipant}
+            className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-primary text-black text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
+          >
+            <UserPlus size={14} />
+            {addingParticipant ? "Añadiendo" : "Añadir a feria"}
+          </button>
+        </form>
+
+        <div className="border-t border-white/5 px-6 py-4 text-xs leading-6 text-white/40">
+          Usa esta opcion cuando el usuario ya existe en la plataforma. Si no existe, crea una invitacion o enviale el enlace de la feria.
+        </div>
       </section>
 
       <section className="glass rounded-[2rem] border border-white/5 overflow-hidden">
