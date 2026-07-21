@@ -7,14 +7,29 @@ dotenv.config();
 
 const app: Express = express();
 const port = process.env.PORT || 3001;
-const corsOrigins = (process.env.CORS_ORIGINS || '')
-  .split(',')
+const defaultCorsOrigins = [
+  'https://www.ieventsplus.tech',
+  'https://ieventsplus.tech',
+  'https://ferias-virtuales.vercel.app',
+];
+const corsOrigins = [
+  ...defaultCorsOrigins,
+  ...(process.env.CORS_ORIGINS || '').split(','),
+]
   .map((origin) => origin.trim())
   .filter(Boolean);
+const allowedCorsOrigins = new Set(corsOrigins);
 
 // Middleware
 app.use(cors({
-  origin: corsOrigins.length > 0 ? corsOrigins : true,
+  origin: (origin, callback) => {
+    if (!origin || allowedCorsOrigins.has(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error(`CORS origin not allowed: ${origin}`));
+  },
   credentials: true,
 }));
 app.use(express.json());
